@@ -46,7 +46,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .btn.quiet{border-color:transparent;background:transparent;color:var(--muted)}
 .save-state{font-size:.8rem;color:var(--muted);min-width:7rem;text-align:right}
 
-.layout{display:grid;grid-template-columns:17rem minmax(0,1fr);gap:0;max-width:78rem;margin:0 auto}
+.layout{display:grid;grid-template-columns:16rem minmax(0,1fr);gap:0;max-width:120rem;margin:0 auto}
 nav.route{padding:1.5rem 1rem 2rem 1.25rem;position:sticky;top:4rem;align-self:start;max-height:calc(100vh - 4rem);overflow:auto}
 .route ol{list-style:none;margin:0;padding:0;position:relative}
 .route ol::before{content:"";position:absolute;left:.6rem;top:.9rem;bottom:.9rem;width:2px;background:var(--line)}
@@ -66,16 +66,72 @@ main{padding:1.75rem 1.5rem 4rem;min-width:0}
 .step-num{font-stretch:75%;font-weight:700;color:var(--muted);font-size:1rem}
 h1{font-stretch:75%;font-weight:800;font-size:clamp(2rem,4vw,2.9rem);line-height:1.02;letter-spacing:-.015em;margin:.1rem 0 .6rem}
 .lead{color:var(--muted);margin:0 0 1.5rem;max-width:42rem}
-section.block{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:1.1rem 1.25rem;margin:0 0 1rem;max-width:56rem}
+section.block{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:1.1rem 1.25rem;margin:0 0 1rem}
 section.block h2{font-size:1.05rem;font-weight:700;margin:0 0 .75rem}
 .note{background:var(--soft);border-color:transparent}
 .note p,.note ul{margin:.25rem 0}
 .note ul{padding-left:1.1rem}
 
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:.85rem 1rem}
-label.f{display:flex;flex-direction:column;gap:.25rem;font-size:.85rem;color:var(--muted)}
-label.f.wide{grid-column:1/-1}
-input[type=text],input[type=date],input[type=url],select,textarea{width:100%;padding:.5rem .6rem;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font-size:.95rem}
+.f{display:flex;flex-direction:column;gap:.25rem;font-size:.85rem;color:var(--muted)}
+.f.wide{grid-column:1/-1}
+.cityfield .chips{display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;padding:.3rem .4rem;border:1px solid var(--line);border-radius:6px;background:var(--bg);position:relative;cursor:text}
+.cityfield .chips:focus-within{border-color:var(--accent)}
+.chip{display:inline-flex;align-items:center;gap:.3rem;background:var(--soft);color:var(--ink);border-radius:999px;padding:.15rem .25rem .15rem .65rem;font-size:.88rem}
+.chip small{color:var(--muted)}
+.chip button{border:0;background:transparent;cursor:pointer;color:var(--muted);font-size:1rem;line-height:1;padding:0 .25rem}
+.chip button:hover{color:var(--gap)}
+.cityfield .chips input{flex:1 1 9rem;min-width:9rem;border:0;background:transparent;padding:.3rem;font-size:.95rem;color:var(--ink)}
+.cityfield .chips input:focus{outline:none}
+.citylist{position:absolute;left:0;right:0;top:calc(100% + 4px);background:var(--surface);border:1px solid var(--line);border-radius:8px;list-style:none;margin:0;padding:.25rem;z-index:15;max-height:16rem;overflow:auto;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.citylist li{padding:.4rem .6rem;border-radius:6px;cursor:pointer;display:flex;justify-content:space-between;gap:1rem;color:var(--ink);font-size:.92rem}
+.citylist li small{color:var(--muted)}
+.citylist li.on,.citylist li:hover{background:var(--soft)}
+.cityhint{font-size:.82rem;color:var(--muted)}
+ul.countries{margin:.25rem 0 0;padding-left:1.1rem}
+.pills{display:flex;flex-wrap:wrap;gap:.4rem}
+.pill{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:.35rem .85rem;cursor:pointer;font-size:.9rem}
+.pill:hover{border-color:var(--accent)}
+.pill[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.f .other{margin-top:.5rem}
+.dayrow{display:grid;grid-template-columns:8.5rem minmax(0,1fr);gap:.4rem 1rem;padding:.65rem 0;border-top:1px solid var(--line);align-items:start}
+.dayrow:first-child{border-top:0;padding-top:.2rem}
+.dayrow .d{font-weight:600;color:var(--ink);padding-top:.35rem}
+.dayrow .daynote{margin-top:.45rem}
+@media (max-width:600px){.dayrow{grid-template-columns:1fr}}
+.calbar{margin-bottom:.6rem}
+.cal{max-width:22rem;border:1px solid var(--line);border-radius:8px;padding:.6rem;background:var(--bg)}
+.calhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;color:var(--ink)}
+.calhead .btn{padding:.15rem .75rem;font-size:1.15rem}
+.calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.calgrid .wd{font-size:.72rem;color:var(--muted);text-align:center;padding:.2rem 0}
+.cd{aspect-ratio:1;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--ink);cursor:pointer;font-size:.88rem;padding:0}
+.cd:hover{border-color:var(--accent)}
+.cd.trip{background:var(--soft)}
+.cd.today{text-decoration:underline;text-underline-offset:3px}
+.cd.fx{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+.cd.fl{border:2px dashed var(--accent);color:var(--accent);font-weight:700}
+.calkey{display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;margin:.5rem 0 0;font-size:.78rem}
+.sw{display:inline-block;width:.8rem;height:.8rem;border-radius:3px;margin-left:.45rem}
+.sw:first-child{margin-left:0}
+.sw.trip{background:var(--soft);border:1px solid var(--line)}
+.sw.fx{background:var(--accent)}
+.sw.fl{border:2px dashed var(--accent)}
+.tlist{margin-top:.75rem}
+.trow{display:grid;grid-template-columns:7.5rem 5.5rem 7.5rem minmax(0,1fr) 2rem;gap:.5rem;align-items:center;padding:.4rem 0;border-top:1px solid var(--line)}
+.trow:first-child{border-top:0}
+.trow .d{font-weight:600;color:var(--ink)}
+.tag{font-size:.78rem;border-radius:999px;padding:.1rem .55rem;text-align:center}
+.tag.fx{background:var(--accent);color:var(--accent-ink)}
+.tag.fl{border:1.5px dashed var(--accent);color:var(--accent)}
+.brow{display:grid;grid-template-columns:6rem 10rem minmax(0,13rem) 2rem;gap:.5rem;align-items:center;margin-bottom:.45rem}
+@media (max-width:600px){
+  .trow{grid-template-columns:1fr auto}
+  .trow input[type=text]{grid-column:1/-1}
+  .brow{grid-template-columns:5.5rem 1fr 2rem}
+  .brow select[data-bud$="|for"]{grid-column:1/3}
+}
+input[type=text],input[type=date],input[type=time],input[type=url],select,textarea{width:100%;padding:.5rem .6rem;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font-size:.95rem}
 textarea{min-height:4.5rem;resize:vertical}
 
 ul.checks{list-style:none;margin:0;padding:0}
@@ -85,8 +141,8 @@ ul.checks input{width:1.15rem;height:1.15rem;margin:.15rem 0 0;accent-color:var(
 ul.checks input:checked+span{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--line)}
 
 .tbl-wrap{overflow-x:auto}
-table.ed{border-collapse:collapse;width:100%;min-width:40rem;font-size:.88rem}
-table.ed th{text-align:left;font-weight:600;color:var(--muted);padding:.3rem .35rem;border-bottom:1px solid var(--line);white-space:nowrap}
+table.ed{border-collapse:collapse;width:100%;min-width:40rem;font-size:.88rem;table-layout:fixed}
+table.ed th{text-align:left;font-weight:600;color:var(--muted);padding:.3rem .35rem;border-bottom:1px solid var(--line);line-height:1.2;vertical-align:bottom}
 table.ed td{padding:.25rem .2rem;vertical-align:top}
 table.ed input,table.ed select{font-size:.88rem;padding:.35rem .45rem}
 table.ed td.x{width:2rem}
@@ -101,7 +157,7 @@ tr.is-gap select{border-color:var(--gap);color:var(--gap);font-weight:600}
 pre.msg{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:.9rem;font-family:var(--font);font-size:.92rem;margin:0 0 .75rem}
 .row{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center}
 .status{font-size:.85rem;color:var(--muted)}
-.nav-foot{display:flex;justify-content:space-between;gap:1rem;max-width:56rem;margin-top:1.5rem}
+.nav-foot{display:flex;justify-content:space-between;gap:1rem;margin-top:1.5rem}
 
 .brief-wrap{overflow-x:auto;background:var(--bg);border-radius:8px;padding:1rem;border:1px solid var(--line)}
 #brief{width:794px;background:#fff;color:#1D2A2E;padding:40px 44px;font-family:var(--font);font-size:11.5px;line-height:1.4;margin:0 auto}
@@ -139,6 +195,7 @@ pre.msg{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);b
   <div class="brand">Trip runbook<small>Jaya’s travel, door to door</small></div>
   <select id="tripSelect" aria-label="Choose a trip"></select>
   <button class="btn" id="newTrip">New trip</button>
+  <button class="btn primary" id="dlTop">Download trip brief</button>
   <button class="btn quiet" id="delTrip">Delete trip</button>
   <button class="btn quiet" id="backup">Back up</button>
   <button class="btn quiet" id="restoreBtn">Restore</button>
@@ -162,25 +219,27 @@ const PROFILE_NOTE = `<p>From Jaya’s travel profile:</p><ul>
 <li>China trains: second class unless Jaya asks for first (still to confirm). Hong Kong to Shenzhen: ask train or car.</li>
 <li>Hong Kong hotels: The 99 Bonham or The Jervois suites. Leisure: Booking.com, boutique, double with balcony.</li></ul>`;
 
+const LEG_TYPES=['Car, home to the airport','Departure lounge','Flight out','Pick-up on arrival','Hotel','Meeting','Factory visit','Event','Driver between suppliers','Dinner','Train between cities','Flight between cities','Car between cities','Transfer to the airport','Return lounge','Flight home','Car, airport to home','Other'];
 const STEPS = [
  {id:'intake', title:'Intake', when:'Same day it’s mentioned',
   lead:'Get the basics down and ask Jaya for anything missing.',
   blocks:[
    {type:'fields', title:'Trip', fields:[
      {k:'tripName',label:'Trip name',ph:'e.g. Shenzhen suppliers, Nov 2026'},
-     {k:'destination',label:'Destination(s)',ph:'Cities on the route'},
-     {k:'dateOut',label:'Leaves',type:'date'},
-     {k:'dateBack',label:'Back',type:'date'},
+     {k:'destination',label:'Destination(s)',type:'cities',wide:true},
+     {k:'dateOut',label:'Leaves',type:'date',days:true},
+     {k:'dateBack',label:'Back',type:'date',days:true},
      {k:'kind',label:'Work or personal',type:'select',options:['Work','Personal'],rerender:true},
      {k:'china',label:'China or another WeChat country?',type:'select',options:['No','Yes'],rerender:true},
-     {k:'purpose',label:'Purpose (one line)',wide:true},
-     {k:'days',label:'Purpose of each day (meetings, factory visits, events)',type:'textarea',wide:true},
+     {k:'purpose',label:'Purpose',type:'purpose',wide:true},
+     {k:'days',label:'Purpose of each day',type:'dayplan',wide:true},
      {k:'meeting',label:'Who he’s meeting, and who needs to know he’s coming',type:'textarea',wide:true},
-     {k:'fixedTimes',label:'Fixed times and flexible times',type:'textarea'},
-     {k:'unusual',label:'Budget limits or anything unusual (samples, cash, companions)',type:'textarea'},
+     {k:'fixedTimes',label:'Fixed and flexible dates',type:'times',wide:true},
+     {k:'budget',label:'Budget limits',type:'budget',wide:true},
+     {k:'unusual',label:'Anything unusual (samples, cash, companions)',type:'textarea',wide:true},
      {k:'selfSorted',label:'Legs Jaya will sort himself',type:'textarea',wide:true}]},
    {type:'table', title:'Travellers', key:'travellers', cols:[
-     {k:'name',label:'Name'},{k:'mobile',label:'Mobile'},{k:'chat',label:'WhatsApp / WeChat'},{k:'email',label:'Email'},{k:'flights',label:'Flights'},{k:'room',label:'Room'}]},
+     {k:'name',label:'Name'},{k:'mobile',label:'Mobile'},{k:'chat',label:'WhatsApp / WeChat'},{k:'email',label:'Email'},{k:'flights',label:'Flights'}]},
    {type:'note', html:'<p>Passport details for every traveller go in 1Password only, never here.</p>'},
    {type:'checks', title:'Done', items:['Work or personal noted','Every traveller’s mobile and email noted','Where, when and the purpose of each day','Who he’s meeting and who needs to know','Fixed and flexible times','Budget limits or anything unusual','Legs Jaya will sort himself written down']},
    {type:'checks', title:'China', showIf:'china', items:['David Zheng told the dates today']}
@@ -188,6 +247,7 @@ const STEPS = [
  {id:'research', title:'Research', when:'Before any options',
   lead:'Check every item against the profile. If the profile doesn’t answer it, it goes on the booking check as a question.',
   blocks:[
+   {type:'countries'},
    {type:'note', html:PROFILE_NOTE},
    {type:'fields', title:'Entry, insurance and money', fields:[
      {k:'entryRoute',label:'Entry route (visa or visa-free, length of stay)',wide:true},
@@ -215,9 +275,10 @@ const STEPS = [
   blocks:[
    {type:'gaps'},
    {type:'table', title:'Legs', key:'legs', cols:[
-     {k:'day',label:'Day'},{k:'local',label:'Local time'},{k:'syd',label:'Sydney time'},{k:'what',label:'What'},{k:'where',label:'Where'},
-     {k:'who',label:'Who'},{k:'by',label:'Booked or confirmed by'},{k:'ref',label:'Booking ref'},
-     {k:'status',label:'Status',type:'select',options:['Gap','Booked','Confirmed','Jaya sorting']}]},
+     {k:'status',label:'Status',type:'select',options:['Gap','Booked','Confirmed','Jaya sorting'],w:8},
+     {k:'what',label:'What',type:'select',options:LEG_TYPES,w:17},
+     {k:'day',label:'Day',w:6},{k:'local',label:'Local time',w:5.5},{k:'syd',label:'Sydney time',w:5.5},
+     {k:'where',label:'Where',w:11},{k:'who',label:'Who',w:9},{k:'by',label:'Booked or confirmed by',w:9},{k:'ref',label:'Booking ref',w:7}]},
    {type:'checks', title:'Done', items:['Every leg booked, confirmed by a named person, or marked as Jaya sorting it','Any gap raised with Jaya before he leaves']}
  ]},
  {id:'check', title:'Booking check', when:'Wait for “yes”',
@@ -333,15 +394,256 @@ const STEPS = [
  ]}
 ];
 
+const CITY_DATA=`Shenzhen|China|深圳
+Guangzhou|China|广州,canton
+Foshan|China|佛山
+Dongguan|China|东莞
+Huizhou|China|惠州
+Zhongshan|China|中山
+Zhuhai|China|珠海
+Jiangmen|China|江门
+Shantou|China|汕头
+Chaozhou|China|潮州
+Xiamen|China|厦门,amoy
+Fuzhou|China|福州
+Quanzhou|China|泉州
+Jinjiang|China|晋江
+Hangzhou|China|杭州
+Ningbo|China|宁波
+Wenzhou|China|温州
+Yiwu|China|义乌
+Jinhua|China|金华
+Shaoxing|China|绍兴
+Taizhou|China|台州
+Huzhou|China|湖州
+Jiaxing|China|嘉兴
+Yongkang|China|永康
+Shanghai|China|上海
+Suzhou|China|苏州
+Wuxi|China|无锡
+Nanjing|China|南京,nanking
+Changzhou|China|常州
+Nantong|China|南通
+Kunshan|China|昆山
+Yangzhou|China|扬州
+Beijing|China|北京,peking
+Tianjin|China|天津
+Qingdao|China|青岛
+Jinan|China|济南
+Yantai|China|烟台
+Weifang|China|潍坊
+Linyi|China|临沂
+Dalian|China|大连
+Shenyang|China|沈阳
+Harbin|China|哈尔滨
+Changchun|China|长春
+Wuhan|China|武汉
+Changsha|China|长沙
+Nanchang|China|南昌
+Hefei|China|合肥
+Zhengzhou|China|郑州
+Xi'an|China|西安,xian
+Chengdu|China|成都
+Chongqing|China|重庆
+Kunming|China|昆明
+Guiyang|China|贵阳
+Nanning|China|南宁
+Guilin|China|桂林
+Haikou|China|海口
+Sanya|China|三亚
+Lanzhou|China|兰州
+Taiyuan|China|太原
+Shijiazhuang|China|石家庄
+Hohhot|China|呼和浩特
+Urumqi|China|乌鲁木齐
+Lhasa|China|拉萨
+Hong Kong|Hong Kong|香港,hongkong,hk,kowloon
+Macau|Macau|澳门,macao
+Taipei|Taiwan|台北
+Kaohsiung|Taiwan|高雄
+Taichung|Taiwan|台中
+Sydney|Australia|syd
+Melbourne|Australia|mel
+Brisbane|Australia|bne
+Perth|Australia|
+Adelaide|Australia|
+Gold Coast|Australia|
+Canberra|Australia|
+Hobart|Australia|
+Darwin|Australia|
+Cairns|Australia|
+Auckland|New Zealand|
+Wellington|New Zealand|
+Christchurch|New Zealand|
+Queenstown|New Zealand|
+Singapore|Singapore|sg
+Kuala Lumpur|Malaysia|kl
+Penang|Malaysia|george town
+Johor Bahru|Malaysia|jb
+Bangkok|Thailand|
+Phuket|Thailand|
+Chiang Mai|Thailand|
+Ho Chi Minh City|Vietnam|saigon,hcmc
+Hanoi|Vietnam|
+Da Nang|Vietnam|danang
+Jakarta|Indonesia|
+Bali (Denpasar)|Indonesia|bali,denpasar,ubud,seminyak
+Surabaya|Indonesia|
+Manila|Philippines|
+Cebu|Philippines|
+Clark|Philippines|
+Phnom Penh|Cambodia|
+Tokyo|Japan|東京
+Osaka|Japan|大阪
+Kyoto|Japan|
+Fukuoka|Japan|
+Sapporo|Japan|
+Seoul|South Korea|
+Busan|South Korea|
+Mumbai|India|bombay
+Delhi|India|new delhi
+Bengaluru|India|bangalore
+Dubai|United Arab Emirates|
+Abu Dhabi|United Arab Emirates|
+Doha|Qatar|
+London|United Kingdom|
+Manchester|United Kingdom|
+Paris|France|
+Rome|Italy|
+Milan|Italy|
+Barcelona|Spain|
+Madrid|Spain|
+Berlin|Germany|
+Frankfurt|Germany|
+Munich|Germany|
+Cologne|Germany|koln
+Amsterdam|Netherlands|
+Zurich|Switzerland|
+Vienna|Austria|
+Athens|Greece|
+Istanbul|Turkey|
+Lisbon|Portugal|
+Dublin|Ireland|
+Copenhagen|Denmark|
+Stockholm|Sweden|
+Las Vegas|United States|vegas
+Los Angeles|United States|la
+San Francisco|United States|sf
+New York|United States|nyc
+Chicago|United States|
+Orlando|United States|
+Atlanta|United States|
+Dallas|United States|
+Honolulu|United States|hawaii
+Seattle|United States|
+Vancouver|Canada|
+Toronto|Canada|`.split('\n').map(l=>{const [name,country,al]=l.split('|');return {name,country,keys:[name,...(al?al.split(','):[])].map(cityNorm).filter(Boolean)}});
+function cityNorm(s){return String(s||'').toLowerCase().replace(/[^a-z0-9\u3400-\u9fff]/g,'')}
+function findCity(s){const n=cityNorm(s);return n?CITY_DATA.find(c=>c.keys.includes(n)):null}
+function destList(t=cur){return (t.f.destination||'').split(/[,;]+/).map(x=>x.trim()).filter(Boolean)}
+function routeCountries(){return [...new Set(destList().map(x=>findCity(x)?.country).filter(Boolean))]}
+function unlistedCities(){return destList().filter(x=>!findCity(x))}
+function cityHint(){
+  const cs=routeCountries(), un=unlistedCities();
+  if(!cs.length&&!un.length)return 'Type to search. Press Enter or a comma to add a city that isn’t in the list.';
+  let h=cs.length?`Countries on the route: ${esc(cs.join(', '))}.`:'';
+  if(un.length)h+=` Not in the city list, kept as typed: ${esc(un.join(', '))}.`;
+  return h;
+}
+function cityFieldHTML(f){
+  const items=destList();
+  const chips=items.map((x,i)=>{const c=findCity(x);return `<span class="chip">${esc(c?c.name:x)}${c?` <small>${esc(c.country)}</small>`:''}<button type="button" data-rmcity="${i}" aria-label="Remove ${esc(c?c.name:x)}">×</button></span>`}).join('');
+  return `<div class="f wide cityfield"><label for="cityInput">${esc(f.label)}</label><div class="chips">${chips}<input id="cityInput" type="text" autocomplete="off" spellcheck="false" placeholder="${items.length?'Add another city':'Type a city, e.g. Shenzhen'}" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="cityList"><ul class="citylist" id="cityList" role="listbox" hidden></ul></div><div class="cityhint" id="cityHint">${cityHint()}</div></div>`;
+}
+const PURPOSES=['Supplier and factory visits','Trade show or event','Conference','Meetings','Personal or leisure','Other'];
+const DAY_TAGS=['Travel','Event','Meetings','Factory visits','Free / rest','Leisure'];
+function purposeChoice(){const f=cur.f; if(f.purposeChoice)return f.purposeChoice; if(!f.purpose)return ''; return PURPOSES.includes(f.purpose)?f.purpose:'Other'}
+function purposeHTML(fd){
+  const ch=purposeChoice();
+  return `<div class="f wide"><span id="purposeLbl">${esc(fd.label)}</span><div class="pills" role="group" aria-labelledby="purposeLbl">${PURPOSES.map(o=>`<button type="button" class="pill" data-purpose="${esc(o)}" aria-pressed="${o===ch}">${esc(o)}</button>`).join('')}</div>${ch==='Other'?`<input class="other" type="text" data-f="purpose" id="purposeOther" placeholder="Describe the purpose" aria-label="Other purpose" value="${esc(cur.f.purpose&&!PURPOSES.includes(cur.f.purpose)?cur.f.purpose:'')}">`:''}</div>`;
+}
+function tripDates(t=cur){
+  const a=t.f.dateOut,b=t.f.dateBack; if(!a||!b)return [];
+  const out=[]; let d=new Date(a+'T00:00:00Z'); const end=new Date(b+'T00:00:00Z');
+  if(isNaN(d)||isNaN(end)||end<d)return [];
+  while(d<=end&&out.length<45){out.push(d.toISOString().slice(0,10)); d=new Date(d.getTime()+86400000)}
+  return out;
+}
+function dayLabel(iso){return new Date(iso+'T00:00:00Z').toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short',timeZone:'UTC'})}
+function dayPlanInner(){
+  const ds=tripDates(); cur.dp=cur.dp||{};
+  if(!ds.length)return `<p class="status">Set the Leaves and Back dates above and each day appears here.</p>`;
+  return ds.map(d=>{const e=cur.dp[d]||{tags:[],note:''};
+    return `<div class="dayrow"><div class="d">${esc(dayLabel(d))}</div><div><div class="pills" role="group" aria-label="${esc(dayLabel(d))}">${DAY_TAGS.map(t=>`<button type="button" class="pill" data-daytag="${d}|${esc(t)}" aria-pressed="${(e.tags||[]).includes(t)}">${esc(t)}</button>`).join('')}</div><input class="daynote" type="text" data-daynote="${d}" placeholder="Note (optional): which supplier, event or city" aria-label="Note for ${esc(dayLabel(d))}" value="${esc(e.note||'')}"></div></div>`}).join('');
+}
+function dayPlanHTML(fd){return `<div class="f wide"><span>${esc(fd.label)}</span><div id="dayPlan">${dayPlanInner()}</div></div>`}
+const CURRENCIES=['AUD','CNY','HKD','USD','SGD','EUR','GBP','JPY','NZD','PHP','MYR','THB','IDR','VND','KRW','TWD','MOP','AED','QAR'];
+const BUDGET_FOR=['Whole trip','Flights','Hotel per night','Per day','Ground transport','Other'];
+let calMode='Fixed', calView=null;
+function isoToday(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function timesInner(){
+  cur.times=cur.times||{};
+  if(!calView)calView=(cur.f.dateOut||isoToday()).slice(0,7);
+  const [y,m]=calView.split('-').map(Number);
+  const first=new Date(Date.UTC(y,m-1,1)); const n=new Date(Date.UTC(y,m,0)).getUTCDate(); const lead=(first.getUTCDay()+6)%7;
+  const trip=new Set(tripDates()); const today=isoToday();
+  let cells=''; for(let i=0;i<lead;i++)cells+='<span></span>';
+  for(let d=1;d<=n;d++){const iso=`${calView}-${String(d).padStart(2,'0')}`; const t=cur.times[iso];
+    const cls=['cd',trip.has(iso)?'trip':'',t?(t.kind==='Fixed'?'fx':'fl'):'',iso===today?'today':''].join(' ');
+    cells+=`<button type="button" class="${cls}" data-cal="${iso}" aria-pressed="${!!t}" aria-label="${esc(dayLabel(iso))}${t?', '+t.kind.toLowerCase():''}">${d}</button>`}
+  const month=first.toLocaleDateString('en-AU',{month:'long',year:'numeric',timeZone:'UTC'});
+  const list=Object.keys(cur.times).sort().map(iso=>{const t=cur.times[iso]; const L=esc(dayLabel(iso));
+    return `<div class="trow"><span class="d">${L}</span><span class="tag ${t.kind==='Fixed'?'fx':'fl'}">${t.kind}</span><input type="time" data-tm="${iso}|time" value="${esc(t.time||'')}" aria-label="Time on ${L}"><input type="text" data-tm="${iso}|note" value="${esc(t.note||'')}" placeholder="What’s on (e.g. event opening, supplier meeting)" aria-label="What’s on ${L}"><button type="button" class="del" data-tmdel="${iso}" aria-label="Remove ${L}">×</button></div>`}).join('');
+  return `<div class="calbar"><div class="pills" role="group" aria-label="Mark dates as">${['Fixed','Flexible'].map(k=>`<button type="button" class="pill" data-calmode="${k}" aria-pressed="${calMode===k}">Mark as ${k.toLowerCase()}</button>`).join('')}</div></div>
+  <div class="cal"><div class="calhead"><button type="button" class="btn quiet" data-calnav="-1" aria-label="Previous month">‹</button><strong>${esc(month)}</strong><button type="button" class="btn quiet" data-calnav="1" aria-label="Next month">›</button></div>
+  <div class="calgrid">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(w=>`<span class="wd">${w}</span>`).join('')}${cells}</div>
+  <p class="status calkey"><span class="sw trip"></span>Trip dates<span class="sw fx"></span>Fixed<span class="sw fl"></span>Flexible</p></div>
+  ${list?`<div class="tlist">${list}</div>`:'<p class="status">Click dates on the calendar to mark them, then add the time and what’s on.</p>'}`;
+}
+function timesHTML(fd){return `<div class="f wide"><span>${esc(fd.label)}</span><div id="timesBlock">${timesInner()}</div></div>`}
+function refreshTimes(focusSel){const b=$('#timesBlock'); if(b)b.innerHTML=timesInner(); if(focusSel){const el=document.querySelector(focusSel); if(el)el.focus()}}
+function budgetInner(){
+  if(!cur.budget||!cur.budget.length)cur.budget=[{c:'AUD',a:'',for:'Whole trip'}];
+  return cur.budget.map((b,i)=>`<div class="brow"><select data-bud="${i}|c" aria-label="Currency, line ${i+1}">${CURRENCIES.map(c=>`<option ${c===b.c?'selected':''}>${c}</option>`).join('')}</select><input type="text" inputmode="decimal" data-bud="${i}|a" value="${esc(b.a||'')}" placeholder="Amount" aria-label="Amount, line ${i+1}"><select data-bud="${i}|for" aria-label="Applies to, line ${i+1}">${BUDGET_FOR.map(o=>`<option ${o===b.for?'selected':''}>${o}</option>`).join('')}</select><button type="button" class="del" data-buddel="${i}" aria-label="Remove budget line ${i+1}">×</button></div>`).join('')+`<button type="button" class="btn add" data-budadd="1">Add budget line</button>`;
+}
+function budgetHTML(fd){return `<div class="f wide"><span>${esc(fd.label)}</span><div id="budgetBlock">${budgetInner()}</div></div>`}
+function refreshBudget(){const b=$('#budgetBlock'); if(b)b.innerHTML=budgetInner()}
+let cityHi=0, cityMatches=[];
+function showCityList(q){
+  const ul=$('#cityList'), inp=$('#cityInput'); if(!ul)return;
+  const n=cityNorm(q); if(!n){ul.hidden=true;inp.setAttribute('aria-expanded','false');return}
+  const have=new Set(destList().map(x=>cityNorm(findCity(x)?.name||x)));
+  const starts=[],has=[];
+  for(const c of CITY_DATA){ if(have.has(cityNorm(c.name)))continue;
+    if(c.keys.some(k=>k.startsWith(n)))starts.push(c);
+    else if(c.keys.some(k=>k.includes(n))||cityNorm(c.country).startsWith(n))has.push(c); }
+  cityMatches=[...starts,...has].slice(0,8); cityHi=0;
+  const exact=cityMatches.some(c=>c.keys.includes(n));
+  ul.innerHTML=cityMatches.map((c,i)=>`<li role="option" id="co${i}" data-pick="${i}" class="${i===0?'on':''}">${esc(c.name)}<small>${esc(c.country)}</small></li>`).join('')
+    +(exact?'':`<li role="option" id="cofree" data-free="1" class="${cityMatches.length?'':'on'}">Add “${esc(q.trim())}”<small>as typed</small></li>`);
+  ul.hidden=false; inp.setAttribute('aria-expanded','true');
+}
+function addCities(names,rest=''){
+  const arr=destList();
+  names.forEach(nm=>{const c=findCity(nm); const v=(c?c.name:String(nm)).trim(); if(v&&!arr.some(x=>cityNorm(findCity(x)?.name||x)===cityNorm(v)))arr.push(v)});
+  cur.f.destination=arr.join(', '); afterDestChange(rest);
+}
+function afterDestChange(rest=''){
+  cur.f.destination=destList().map(x=>findCity(x)?.name||x).join(', ');
+  if(routeCountries().includes('China')&&cur.f.china!=='Yes'){cur.f.china='Yes';toast('Mainland China is on the route, so the China and WeChat checks are on')}
+  queueSave(); renderStep(); refreshDerived();
+  const inp=$('#cityInput'); if(inp){inp.value=rest; inp.focus(); if(rest)showCityList(rest)}
+}
+
 function newTrip(){
   const id='t'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
   const leg=(what,where='')=>({day:'',local:'',syd:'',what,where,who:'',by:'',ref:'',status:'Gap'});
   return {id,created:Date.now(),updated:Date.now(),step:0,
     f:{kind:'Work',china:'No'},c:{},
     t:{
-      travellers:[{name:'Jaya Yoannidis',mobile:'',chat:'',email:'',flights:'',room:''}],
-      legs:[leg('Car, home to the airport'),leg('Departure lounge'),leg('Flight out'),leg('Pick-up on arrival'),leg('Hotel, night 1'),
-            leg('Meetings and visits (who drives)'),leg('Between cities'),leg('Transfer to the airport'),leg('Return lounge'),leg('Flight home'),leg('Car, airport to home')],
+      travellers:[{name:'Jaya Yoannidis',mobile:'',chat:'',email:'',flights:''}],
+      legs:[leg('Car, home to the airport'),leg('Departure lounge'),leg('Flight out'),leg('Pick-up on arrival'),leg('Hotel'),
+            leg('Meeting'),leg('Factory visit'),leg('Transfer to the airport'),leg('Return lounge'),leg('Flight home'),leg('Car, airport to home')],
       hotels:[{name:'',nights:'',addrEn:'',addrLocal:'',desk:'',ref:'',cancel:''}],
       contacts:[{person:'David Zheng',role:'Sourcing, China',when:'',phone:''},{person:'',role:'Driver',when:'',phone:''},{person:'',role:'Hotel front desk',when:'',phone:''},{person:'Anj Tino',role:'EA, daily check-in',when:'',phone:''}],
       cities:[{city:'',contact:'',phone:'',desk:''}],
@@ -397,7 +699,7 @@ function tripName(t){return t.f.tripName||t.f.destination||'Untitled trip'}
 function renderTripSelect(){
   const sel=$('#tripSelect');
   sel.innerHTML=trips.slice().sort((a,b)=>b.updated-a.updated).map(t=>`<option value="${t.id}" ${cur&&t.id===cur.id?'selected':''}>${esc(tripName(t))}</option>`).join('');
-  $('#delTrip').hidden=!cur;
+  $('#delTrip').hidden=!cur; $('#dlTop').hidden=!cur;
 }
 function renderRail(){
   if(!cur){$('#rail').innerHTML='';return}
@@ -407,6 +709,11 @@ function renderRail(){
   }).join('');
 }
 function fieldHTML(f){
+  if(f.type==='cities')return cityFieldHTML(f);
+  if(f.type==='purpose')return purposeHTML(f);
+  if(f.type==='dayplan')return dayPlanHTML(f);
+  if(f.type==='times')return timesHTML(f);
+  if(f.type==='budget')return budgetHTML(f);
   const v=cur.f[f.k]??''; const attrs=`data-f="${f.k}" ${f.rerender?'data-rr="1"':''} ${f.ph?`placeholder="${esc(f.ph)}"`:''}`;
   let input;
   if(f.type==='textarea')input=`<textarea ${attrs}>${esc(v)}</textarea>`;
@@ -416,12 +723,17 @@ function fieldHTML(f){
 }
 function tableHTML(b){
   const rows=cur.t[b.key]||(cur.t[b.key]=[]);
+  const sized=b.cols.some(c=>c.w);
+  const tot=b.cols.reduce((a,c)=>a+(c.w||8),2.2);
+  const colg=sized?`<colgroup>${b.cols.map(c=>`<col style="width:${((c.w||8)/tot*100).toFixed(2)}%">`).join('')}<col style="width:${(2.2/tot*100).toFixed(2)}%"></colgroup>`:'';
+  const minW=sized?`style="min-width:${Math.round(tot*0.8)}rem"`:'';
   const head=b.cols.map(c=>`<th>${esc(c.label)}</th>`).join('')+'<th></th>';
   const body=rows.map((r,ri)=>`<tr class="${b.key==='legs'&&r.status==='Gap'?'is-gap':''}">${b.cols.map(c=>{
      const v=r[c.k]??''; const a=`data-t="${b.key}" data-r="${ri}" data-c="${c.k}" aria-label="${esc(c.label)} row ${ri+1}"`;
-     return `<td>${c.type==='select'?`<select ${a}>${c.options.map(o=>`<option ${o===v?'selected':''}>${o}</option>`).join('')}</select>`:`<input type="text" ${a} value="${esc(v)}">`}</td>`;
+     const opts=c.type==='select'&&v&&!c.options.includes(v)?[v,...c.options]:c.options;
+     return `<td>${c.type==='select'?`<select ${a}>${opts.map(o=>`<option ${o===v?'selected':''}>${esc(o)}</option>`).join('')}</select>`:`<input type="text" ${a} value="${esc(v)}">`}</td>`;
    }).join('')}<td class="x"><button class="del" data-del="${b.key}:${ri}" aria-label="Remove row ${ri+1}">×</button></td></tr>`).join('');
-  return `<div class="tbl-wrap"><table class="ed"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div><button class="btn add" data-add="${b.key}">Add row</button>`;
+  return `<div class="tbl-wrap"><table class="ed" ${minW}>${colg}<thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div><button class="btn add" data-add="${b.key}">Add row</button>`;
 }
 function bookingMessage(){
   const f=cur.f; const names=(cur.t.travellers||[]).map(t=>t.name).filter(Boolean).join(', ');
@@ -453,6 +765,8 @@ function renderStep(){
     if(b.type==='fields')html+=`<div class="grid">${b.fields.map(fieldHTML).join('')}</div>`;
     if(b.type==='table')html+=tableHTML(b);
     if(b.type==='checks')html+=`<ul class="checks">${b.items.map((it,ii)=>{const k=`${s.id}.${bi}.${ii}`;return `<li><label><input type="checkbox" data-check="${k}" ${cur.c[k]?'checked':''}><span>${esc(it)}</span></label></li>`}).join('')}</ul>`;
+    if(b.type==='countries'){const cs=routeCountries(),un=unlistedCities();
+      html+=`<h2>Entry rules to check</h2>`+(cs.length||un.length?`<p class="status">Check each on the official government or embassy site today, for every traveller’s passport.</p><ul class="countries">${cs.map(c=>`<li>${esc(c)}</li>`).join('')}${un.map(c=>`<li>${esc(c)} (country not recognised, check which it is)</li>`).join('')}</ul>`:`<p class="status">Add destinations in the Intake step and the countries show here.</p>`);}
     if(b.type==='gaps')html+=`<h2>Coverage</h2><div id="gaps">${gapsHTML()}</div>`;
     if(b.type==='bookingcheck')html+=`<h2>Message to send</h2><pre class="msg" id="bcMsg">${esc(bookingMessage())}</pre><button class="btn primary" id="copyMsg">Copy message</button>`;
     if(b.type==='brief')html+=`<h2>Preview</h2><div class="row" style="margin-bottom:.75rem"><button class="btn primary" id="dlPdf">Download trip brief PDF</button><span class="status" id="pdfStatus"></span></div><div class="brief-wrap"><div id="brief">${briefHTML()}</div></div>`;
@@ -468,7 +782,7 @@ function refreshDerived(){
   const br=$('#brief'); if(br)br.innerHTML=briefHTML();
   const opt=$('#tripSelect').querySelector(`option[value="${cur.id}"]`); if(opt)opt.textContent=tripName(cur);
 }
-function renderAll(){renderTripSelect();renderRail();renderStep()}
+function renderAll(){calView=null;renderTripSelect();renderRail();renderStep()}
 
 /* ---------- trip brief ---------- */
 function B(v){return v?esc(v):'<span class="blank">[blank]</span>'}
@@ -484,9 +798,14 @@ function briefHTML(){
   return `<h1>Trip brief: ${B(f.destination||f.tripName)}</h1>
   <p class="sub">${dates?esc(dates):'<span class="blank">[dates]</span>'}${f.kind==='Personal'?' · Personal trip':''} · Prepared by Anj Tino</p>
   <h2>Travellers</h2>
-  <table><tr><th>Name</th><th>Mobile</th><th>WhatsApp / WeChat</th><th>Flights</th><th>Room</th></tr>${rowsOf(t.travellers||[],['name','mobile','chat','flights','room'])}</table>
+  <table><tr><th>Name</th><th>Mobile</th><th>WhatsApp / WeChat</th><th>Flights</th></tr>${rowsOf(t.travellers||[],['name','mobile','chat','flights'])}</table>
   <h2>At a glance</h2>
   <ul><li>Purpose: ${B(f.purpose)}</li>
+  ${(()=>{const ds=tripDates(cur).filter(d=>cur.dp&&cur.dp[d]&&((cur.dp[d].tags||[]).length||cur.dp[d].note));
+     if(ds.length)return `<li>Each day:<ul>${ds.map(d=>{const e=cur.dp[d];return `<li>${esc(dayLabel(d))}: ${esc((e.tags||[]).join(', '))}${e.note?`${(e.tags||[]).length?' · ':''}${esc(e.note)}`:''}</li>`}).join('')}</ul></li>`;
+     return f.days?`<li>Days: ${esc(f.days)}</li>`:'';})()}
+  ${(()=>{const fx=Object.keys(cur.times||{}).sort().filter(d=>cur.times[d].kind==='Fixed');
+     return fx.length?`<li>Fixed times:<ul>${fx.map(d=>{const t=cur.times[d];return `<li>${esc(dayLabel(d))}${t.time?` ${esc(t.time)}`:''}${t.note?`: ${esc(t.note)}`:''}</li>`}).join('')}</ul></li>`:'';})()}
   <li>Out: ${B(f.outDay)}, ${B(f.outFlight)}, ${B(f.outDep)} → ${B(f.outArr)} (${B(f.outSyd)} Sydney)</li>
   <li>Back: ${B(f.backDay)}, ${B(f.backFlight)}, ${B(f.backDep)} → ${B(f.backArr)} Sydney</li>
   <li>Staying: ${hotels.length?hotels.map(h=>`${esc(h.name)}${h.nights?`, ${esc(h.nights)} nights`:''}${h.addrEn?`, ${esc(h.addrEn)}`:''}${h.addrLocal?` / ${esc(h.addrLocal)}`:''}`).join('; '):'<span class="blank">[hotel]</span>'}</li></ul>
@@ -514,8 +833,11 @@ function briefHTML(){
   ${decisions.length?`<h2>Open decisions (need your answer)</h2><table><tr><th>Decision</th><th>Options</th><th>Recommendation</th><th>Needed by</th></tr>${rowsOf(decisions,['decision','options','rec','by'])}</table>`:''}`;
 }
 async function downloadPdf(){
-  const st=$('#pdfStatus'); const el=$('#brief');
+  const stEl=$('#pdfStatus'); const st={set textContent(v){ if(stEl)stEl.textContent=v; else if(v)toast(v)}};
+  if(!cur)return;
   if(!window.jspdf||!window.html2canvas){st.textContent='The PDF tools didn’t load. Reload the page and try again.';return}
+  let el=$('#brief'), tmp=null;
+  if(!el){tmp=document.createElement('div'); tmp.style.cssText='position:fixed;left:-10000px;top:0'; tmp.innerHTML=`<div id="briefTmp" style="width:794px"></div>`; document.body.appendChild(tmp); el=tmp.firstChild; el.id='brief'; el.innerHTML=briefHTML()}
   st.textContent='Building the PDF…';
   try{
     const canvas=await html2canvas(el,{scale:2,backgroundColor:'#ffffff',useCORS:true});
@@ -535,20 +857,60 @@ async function downloadPdf(){
     st.textContent='Downloaded.';
   }catch(e){
     st.textContent = e&&e.code==='declined'?'Download cancelled.':e&&e.code==='rate_limited'?'A download prompt is already open.':'The PDF couldn’t be made. Try again.';
-  }
+  }finally{ if(tmp)tmp.remove(); }
 }
 
 /* ---------- events ---------- */
 document.addEventListener('input',e=>{
   const el=e.target; if(!cur)return;
-  if(el.dataset.f!==undefined){cur.f[el.dataset.f]=el.value; queueSave(); if(el.dataset.rr){renderStep();renderRail()} else refreshDerived(); return}
+  if(el.id==='cityInput'){
+    if(/[,;]/.test(el.value)){const parts=el.value.split(/[,;]/); const rest=parts.pop(); addCities(parts.filter(p=>p.trim()),rest.trimStart()); return}
+    showCityList(el.value); return}
+  if(el.dataset.tm!==undefined){const [d,k]=el.dataset.tm.split('|'); if(cur.times&&cur.times[d]){cur.times[d][k]=el.value; queueSave(); refreshDerived()} return}
+  if(el.dataset.bud!==undefined){const [i,k]=el.dataset.bud.split('|'); if(k==='a'){const v=el.value.replace(/[^0-9.,]/g,''); if(v!==el.value)el.value=v}
+    cur.budget[+i][k]=el.value; queueSave(); return}
+  if(el.dataset.daynote!==undefined){cur.dp=cur.dp||{}; const d=el.dataset.daynote; (cur.dp[d]=cur.dp[d]||{tags:[],note:''}).note=el.value; queueSave(); refreshDerived(); return}
+  if(el.dataset.f!==undefined){cur.f[el.dataset.f]=el.value; queueSave(); if(el.dataset.f==='dateOut'||el.dataset.f==='dateBack'){const dp=$('#dayPlan'); if(dp)dp.innerHTML=dayPlanInner(); if(el.dataset.f==='dateOut'&&el.value)calView=el.value.slice(0,7); refreshTimes()} if(el.dataset.rr){renderStep();renderRail()} else refreshDerived(); return}
   if(el.dataset.t!==undefined){const row=cur.t[el.dataset.t][+el.dataset.r]; row[el.dataset.c]=el.value;
     if(el.dataset.c==='status'){el.closest('tr').classList.toggle('is-gap',el.value==='Gap')}
     queueSave(); refreshDerived(); return}
   if(el.dataset.check!==undefined){if(el.checked)cur.c[el.dataset.check]=true; else delete cur.c[el.dataset.check]; queueSave(); renderRail()}
 });
-document.addEventListener('change',e=>{ if(e.target.matches('select[data-f],select[data-t]'))e.target.dispatchEvent(new Event('input',{bubbles:true})) });
+document.addEventListener('keydown',e=>{
+  if(e.target.id!=='cityInput')return;
+  const ul=$('#cityList'); const items=ul&&!ul.hidden?[...ul.children]:[];
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){ if(!items.length)return; e.preventDefault();
+    cityHi=(cityHi+(e.key==='ArrowDown'?1:-1)+items.length)%items.length;
+    items.forEach((li,i)=>li.classList.toggle('on',i===cityHi)); e.target.setAttribute('aria-activedescendant',items[cityHi].id); items[cityHi].scrollIntoView({block:'nearest'}); }
+  else if(e.key==='Enter'){ e.preventDefault(); const v=e.target.value.trim(); if(!v)return; const li=items[cityHi];
+    addCities([li&&li.dataset.pick!==undefined?cityMatches[+li.dataset.pick].name:v]); }
+  else if(e.key==='Escape'){ if(ul)ul.hidden=true; e.target.setAttribute('aria-expanded','false'); }
+  else if(e.key==='Backspace'&&!e.target.value){ const arr=destList(); if(arr.length){arr.pop(); cur.f.destination=arr.join(', '); afterDestChange()} }
+});
+document.addEventListener('change',e=>{ if(e.target.matches('select[data-f],select[data-t],select[data-bud]'))e.target.dispatchEvent(new Event('input',{bubbles:true})) });
 document.addEventListener('click',async e=>{
+  if(!e.target.closest('.cityfield')){const ul=$('#cityList'); if(ul&&!ul.hidden){ul.hidden=true;$('#cityInput').setAttribute('aria-expanded','false')}}
+  const cm=e.target.closest('[data-calmode]'); if(cm&&cur){calMode=cm.dataset.calmode; refreshTimes(`[data-calmode="${calMode}"]`); return}
+  const cn=e.target.closest('[data-calnav]'); if(cn&&cur){const [y,m]=calView.split('-').map(Number); const d=new Date(Date.UTC(y,m-1+(+cn.dataset.calnav),1)); calView=d.toISOString().slice(0,7); refreshTimes(`[data-calnav="${cn.dataset.calnav}"]`); return}
+  const cd=e.target.closest('[data-cal]'); if(cd&&cur){const iso=cd.dataset.cal; cur.times=cur.times||{}; const t=cur.times[iso];
+    if(t&&t.kind===calMode)delete cur.times[iso]; else cur.times[iso]={kind:calMode,time:t?t.time:'',note:t?t.note:''};
+    queueSave(); refreshTimes(`[data-cal="${iso}"]`); refreshDerived(); return}
+  const td=e.target.closest('[data-tmdel]'); if(td&&cur){delete cur.times[td.dataset.tmdel]; queueSave(); refreshTimes(); refreshDerived(); return}
+  if(e.target.closest('[data-budadd]')&&cur){const last=cur.budget[cur.budget.length-1]; cur.budget.push({c:last?last.c:'AUD',a:'',for:'Whole trip'}); queueSave(); refreshBudget(); const ins=document.querySelectorAll('[data-bud$="|a"]'); if(ins.length)ins[ins.length-1].focus(); return}
+  const bd=e.target.closest('[data-buddel]'); if(bd&&cur){cur.budget.splice(+bd.dataset.buddel,1); queueSave(); refreshBudget(); return}
+  const pp=e.target.closest('[data-purpose]');
+  if(pp&&cur){const v=pp.dataset.purpose; const was=purposeChoice(); cur.f.purposeChoice=v;
+    if(v!=='Other')cur.f.purpose=v; else if(was!=='Other')cur.f.purpose='';
+    queueSave(); renderStep(); refreshDerived(); if(v==='Other'){const o=$('#purposeOther'); if(o)o.focus()} return}
+  const dt=e.target.closest('[data-daytag]');
+  if(dt&&cur){const [d,t]=dt.dataset.daytag.split('|'); cur.dp=cur.dp||{}; const en=(cur.dp[d]=cur.dp[d]||{tags:[],note:''}); en.tags=en.tags||[];
+    const i=en.tags.indexOf(t); if(i>=0)en.tags.splice(i,1); else en.tags.push(t);
+    en.tags.sort((a,b)=>DAY_TAGS.indexOf(a)-DAY_TAGS.indexOf(b));
+    dt.setAttribute('aria-pressed',String(i<0)); queueSave(); refreshDerived(); return}
+  const pick=e.target.closest('[data-pick]'); if(pick){addCities([cityMatches[+pick.dataset.pick].name]);return}
+  if(e.target.closest('[data-free]')){addCities([$('#cityInput').value]);return}
+  const rm=e.target.closest('[data-rmcity]'); if(rm){const arr=destList(); arr.splice(+rm.dataset.rmcity,1); cur.f.destination=arr.join(', '); afterDestChange(); return}
+  if(e.target.classList.contains('chips')){$('#cityInput').focus();return}
   const go=e.target.closest('[data-go]');
   if(go&&cur){const i=+go.dataset.go; if(i>=0&&i<STEPS.length){cur.step=i;queueSave();renderRail();renderStep();window.scrollTo({top:0})} return}
   const add=e.target.closest('[data-add]');
@@ -563,6 +925,7 @@ document.addEventListener('click',async e=>{
 });
 function startNew(){const t=newTrip(); trips.push(t); cur=t; persist(t); renderAll(); const n=document.querySelector('[data-f="tripName"]'); if(n)n.focus()}
 $('#newTrip').addEventListener('click',startNew);
+$('#dlTop').addEventListener('click',downloadPdf);
 $('#tripSelect').addEventListener('change',e=>{cur=trips.find(t=>t.id===e.target.value)||null;renderAll()});
 $('#delTrip').addEventListener('click',async()=>{
   if(!cur)return; if(!confirm(`Delete “${tripName(cur)}”? This can’t be undone.`))return;
