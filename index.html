@@ -183,6 +183,7 @@ table.ed td.nm{font-weight:600;vertical-align:middle;padding-left:.4rem;color:va
 .maplink[hidden]{display:none}
 .citylist li.attrib{cursor:default;font-size:.72rem;color:var(--muted);justify-content:flex-end;padding:.25rem .6rem}
 .citylist li.attrib:hover{background:transparent}
+.citylist li.msg{justify-content:flex-start;font-size:.85rem;white-space:normal}
 .citylist li .pl{display:flex;flex-direction:column;min-width:0}
 .citylist li .pl small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pbriefs{display:flex;flex-wrap:wrap;gap:.4rem;margin:.25rem 0 .9rem}
@@ -18345,13 +18346,19 @@ async function placeBiasPoints(){
   const pts=(await Promise.all(destList().slice(0,3).map(cityPoint))).filter(Boolean);
   return [...pts,PLACE_HOME];
 }
+function positionPlaceList(){const ul=document.getElementById('placeList'), el=placeTarget; if(!ul||!el)return;
+  const rc=el.getBoundingClientRect(); if(rc.bottom<0||rc.top>innerHeight){hidePlaceList();return}
+  const vw=document.documentElement.clientWidth, w=Math.min(Math.max(rc.width,340),vw-16); ul.style.left=Math.max(8,Math.min(rc.left,vw-w-8))+'px'; ul.style.top=(rc.bottom+4)+'px'; ul.style.right='auto'; ul.style.width=w+'px'}
+function showPlaceMsg(el,msg){placeMatches=[]; const ul=placeListEl(); placeTarget=el; ul.innerHTML=`<li class="attrib msg">${esc(msg)}</li>`; positionPlaceList(); ul.hidden=false}
 async function fetchPlaces(el,q){
   const seq=++placeSeq;
+  if(!placeMatches.length||placeTarget!==el)showPlaceMsg(el,'Searching places…');
   try{
     const pts=await placeBiasPoints(); if(seq!==placeSeq)return;
     const lists=await Promise.all(pts.map(pt=>fetch('https://photon.komoot.io/api/?limit=5&lang=en&zoom=12&lat='+pt.lat+'&lon='+pt.lon+'&q='+encodeURIComponent(q))
-      .then(r=>r.ok?r.json():{}).then(j=>j.features||[]).catch(()=>[])));
+      .then(r=>r.ok?r.json():null).then(j=>j?j.features||[]:null).catch(()=>null)));
     if(seq!==placeSeq||document.activeElement!==el)return;
+    if(lists.every(l=>l===null)){showPlaceMsg(el,'Can’t reach place suggestions on this connection. Type the address and use Map to check it.');return}
     const km=(a,g)=>{const x=(g[0]-a.lon)*Math.cos((a.lat+g[1])/2*Math.PI/180), y=g[1]-a.lat; return Math.hypot(x,y)*111};
     const tier=f=>{const g=f.geometry&&f.geometry.coordinates; if(!g)return pts.length; const i=pts.findIndex(pt=>km(pt,g)<60); return i<0?pts.length:i};
     const feats=[]; for(let i=0;i<5;i++)for(const l of lists)if(l[i])feats.push(l[i]);
@@ -18362,11 +18369,11 @@ async function fetchPlaces(el,q){
       const parts=[p.name?street:'',city,p.state,p.country].filter(Boolean).filter((x,i,a)=>a.indexOf(x)===i&&x!==name);
       return {name,sub:parts.join(', '),full:[name,...parts.slice(0,3)].filter(Boolean).join(', ')}}).filter(m=>m.name);
     const seen=new Set(); placeMatches=placeMatches.filter(m=>!seen.has(m.full)&&seen.add(m.full)).slice(0,7);
-    if(!placeMatches.length){hidePlaceList();return}
+    if(!placeMatches.length){showPlaceMsg(el,'No matching places found');return}
     const ul=placeListEl(); placeTarget=el; placeHi=0;
     ul.innerHTML=placeMatches.map((m,i)=>`<li role="option" data-placepick="${i}" class="${i===0?'on':''}"><span class="pl">${esc(m.name)}<small>${esc(m.sub)}</small></span></li>`).join('')+'<li class="attrib" aria-hidden="true">Places from © OpenStreetMap contributors</li>';
-    const rc=el.getBoundingClientRect(); const vw=document.documentElement.clientWidth, w=Math.min(Math.max(rc.width,340),vw-16); ul.style.left=Math.max(8,Math.min(rc.left,vw-w-8))+'px'; ul.style.top=(rc.bottom+4)+'px'; ul.style.right='auto'; ul.style.width=w+'px'; ul.hidden=false;
-  }catch(_){ /* no network here (e.g. inside claude.ai): Map button still works */ }
+    positionPlaceList(); ul.hidden=false;
+  }catch(_){ if(seq===placeSeq&&document.activeElement===el)showPlaceMsg(el,'Can’t reach place suggestions on this connection. Type the address and use Map to check it.') }
 }
 function pickPlace(i){const el=placeTarget, m=placeMatches[i]; if(!el||!m)return; hidePlaceList(); placeSkip=true; el.value=m.full; el.dispatchEvent(new Event('input',{bubbles:true})); el.focus()}
 function mapUrl(q){return 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(String(q||'').trim())}
@@ -18478,7 +18485,7 @@ function tableHTML(b0){
   const body=rows.map((r,ri)=>(LP&&r.person!==LP)?'':`<tr class="${(b.key==='legs'||b.key==='reservations'||b.key==='flights')&&(r.status||'Gap')==='Gap'?'is-gap':''}">${b.cols.map(c=>{
      const v=r[c.k]??''; const a=`data-t="${b.key}" data-r="${ri}" data-c="${c.k}" aria-label="${esc(c.label)} row ${ri+1}"`;
      const base=typeof c.options==='function'?c.options():c.options; const opts=c.type==='select'&&v&&!base.includes(v)?[v,...base]:base;
-     return `<td>${c.type==='select'?`<select ${a}>${opts.map(o=>`<option ${o===v?'selected':''}>${esc(o)}</option>`).join('')}</select>`:(c.maps?`<div class="mapcell"><input type="text" ${a} value="${esc(v)}"><a class="maplink" href="${esc(mapUrl(v))}" target="_blank" rel="noopener" ${String(v).trim()?'':'hidden'} aria-label="Open ${esc(v)} in Google Maps" title="Open in Google Maps">Map</a></div>`:`<input type="${c.type==='date'||c.type==='time'?c.type:'text'}" ${a} ${c.city?'data-citycell="1" autocomplete="off" placeholder="Type a city"':''} value="${esc(v)}">`)}</td>`;
+     return `<td>${c.type==='select'?`<select ${a}>${opts.map(o=>`<option ${o===v?'selected':''}>${esc(o)}</option>`).join('')}</select>`:(c.maps?`<div class="mapcell"><input type="text" ${a} autocomplete="off" value="${esc(v)}"><a class="maplink" href="${esc(mapUrl(v))}" target="_blank" rel="noopener" ${String(v).trim()?'':'hidden'} aria-label="Open ${esc(v)} in Google Maps" title="Open in Google Maps">Map</a></div>`:`<input type="${c.type==='date'||c.type==='time'?c.type:'text'}" ${a} ${c.city?'data-citycell="1" autocomplete="off" placeholder="Type a city"':''} value="${esc(v)}">`)}</td>`;
    }).join('')}<td class="x"><button class="del" data-del="${b.key}:${ri}" aria-label="Remove row ${ri+1}">×</button></td></tr>`).join('');
   return `<div class="tbl-wrap"><table class="ed" ${minW}>${colg}<thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div><div class="row"><button class="btn add" data-add="${b.key}">Add row</button>${optBtn}</div>`;
 }
@@ -18823,7 +18830,8 @@ $('#restoreFile').addEventListener('change',async e=>{
   }catch(_){toast('That file isn’t a trip runbook backup')}
 });
 
-window.addEventListener('scroll',e=>{hideCellList(); if(!(e.target&&e.target.id==='placeList'))hidePlaceList()},true);
+window.addEventListener('scroll',e=>{hideCellList(); if(!(e.target&&e.target.id==='placeList'))positionPlaceList()},true);
+window.addEventListener('resize',positionPlaceList);
 window.addEventListener('resize',()=>hideCellList());
 /* ---------- boot ---------- */
 trips=lsLoad(); cur=trips.slice().sort((a,b)=>b.updated-a.updated)[0]||null; renderAll();
