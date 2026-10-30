@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Trip Runbook</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
@@ -37,7 +39,8 @@ button,input,select,textarea{font:inherit;color:inherit}
 header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line);
   display:flex;flex-wrap:wrap;gap:.75rem;align-items:center;padding:.75rem 1.25rem}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
-.brand{font-stretch:75%;font-weight:800;font-size:1.25rem;letter-spacing:-.01em;margin-right:auto}
+.brand{font-stretch:75%;font-weight:800;font-size:1.25rem;letter-spacing:-.01em;margin-right:auto;display:flex;align-items:center;gap:.6rem}
+.brand img{width:2.4rem;height:2.4rem;flex:0 0 auto}
 .brand small{display:block;font-stretch:100%;font-weight:400;font-size:.8rem;color:var(--muted);letter-spacing:0}
 .top select{min-width:12rem;max-width:100%;padding:.45rem .6rem;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
 .btn{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:.45rem .8rem;cursor:pointer}
@@ -230,7 +233,7 @@ table.ed td.nm{font-weight:600;vertical-align:middle;padding-left:.4rem;color:va
 </head>
 <body>
 <header class="top">
-  <div class="brand">Trip Runbook<small>Jaya’s Travel, Door to Door</small></div>
+  <div class="brand"><img src="favicon.svg" alt=""><div>Trip Runbook<small>Jaya’s Travel, Door to Door</small></div></div>
   <select id="tripSelect" aria-label="Choose a trip"></select>
   <button class="btn" id="newTrip">New Trip</button>
   <button class="btn primary" id="dlTop">Download Trip Brief</button>
