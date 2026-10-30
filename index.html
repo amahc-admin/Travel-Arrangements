@@ -18401,7 +18401,7 @@ async function fetchPlaces(el,q){
 function pickPlace(i){const el=placeTarget, m=placeMatches[i]; if(!el||!m)return; hidePlaceList(); placeSkip=true; el.value=m.full; el.dispatchEvent(new Event('input',{bubbles:true})); el.focus()}
 // Google Drive: files go to "Trip runbook/<trip>" in the Drive of whoever is signed in.
 // Set GOOGLE_CLIENT_ID to an OAuth web client ID whose authorised JavaScript origin is this site.
-const GOOGLE_CLIENT_ID='';
+const GOOGLE_CLIENT_ID='95709746435-c54mg0h49isdfn39p2qnd6re2t6hnn4h.apps.googleusercontent.com';
 let gToken=null, gTokenExp=0, gTokenClient=null;
 if(GOOGLE_CLIENT_ID){const sc=document.createElement('script'); sc.src='https://accounts.google.com/gsi/client'; sc.async=true; document.head.appendChild(sc)}
 function driveSignIn(){
