@@ -190,6 +190,23 @@ table.ed td.nm{font-weight:600;vertical-align:middle;padding-left:.4rem;color:va
 .citylist li .pl{display:flex;flex-direction:column;min-width:0}
 .citylist li .pl small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .legview{margin-bottom:1rem}
+.legmap{height:28rem;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--soft);z-index:0}
+.pin{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#0E6E62;color:#fff;font:700 13px/1 var(--font);border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+.pin.pin-gap{background:#B4441A}
+.map-h{font-size:1rem;margin:1.25rem 0 .5rem}
+.segs{list-style:none;margin:0;padding:0}
+.segs li{display:grid;grid-template-columns:4.5rem minmax(0,1fr) auto auto;gap:.75rem;align-items:center;padding:.5rem 0;border-bottom:1px solid var(--line);font-size:.92rem}
+.seg-n{font-weight:700;color:var(--accent)}
+.segs li[data-zoom]{cursor:pointer}
+.segs li[data-zoom]:hover{background:var(--soft)}
+.seg-t{font-weight:600;white-space:nowrap}
+.segs a,#mcOut a{color:var(--accent)}
+.mapcheck select{flex:1 1 12rem;width:auto}
+@media (max-width:600px){
+  .legmap{height:20rem}
+  .segs li{grid-template-columns:3.5rem minmax(0,1fr)}
+  .segs .seg-t,.segs a{grid-column:2}
+}
 .ov-sum{margin:0 0 .6rem;font-size:1rem}
 .ov-todo{color:var(--gap);font-weight:600}
 .ov-ok{color:var(--accent);font-weight:600}
@@ -18424,7 +18441,8 @@ async function fetchPlaces(el,q){
       const street=[p.housenumber,p.street].filter(Boolean).join(' ');
       const name=p.name||street; const city=p.city||p.town||p.village||p.district||p.county||'';
       const parts=[p.name?street:'',city,p.state,p.country].filter(Boolean).filter((x,i,a)=>a.indexOf(x)===i&&x!==name);
-      return {name,sub:parts.join(', '),full:[name,...parts.slice(0,3)].filter(Boolean).join(', ')}}).filter(m=>m.name);
+      const g=f.geometry&&f.geometry.coordinates;
+      return {name,sub:parts.join(', '),full:[name,...parts.slice(0,3)].filter(Boolean).join(', '),pt:g?{lat:g[1],lon:g[0]}:null}}).filter(m=>m.name);
     const seen=new Set(); placeMatches=placeMatches.filter(m=>!seen.has(m.full)&&seen.add(m.full)).slice(0,7);
     if(!placeMatches.length){showPlaceMsg(el,'No matching places found');return}
     const ul=placeListEl(); placeTarget=el; placeHi=0;
@@ -18432,7 +18450,9 @@ async function fetchPlaces(el,q){
     positionPlaceList(); ul.hidden=false;
   }catch(_){ if(seq===placeSeq&&document.activeElement===el)showPlaceMsg(el,'Can’t reach place suggestions on this connection. Type the address and use Map to check it.') }
 }
-function pickPlace(i){const el=placeTarget, m=placeMatches[i]; if(!el||!m)return; hidePlaceList(); placeSkip=true; el.value=m.full; el.dispatchEvent(new Event('input',{bubbles:true})); el.focus()}
+function pickPlace(i){const el=placeTarget, m=placeMatches[i]; if(!el||!m)return; hidePlaceList(); placeSkip=true; el.value=m.full; el.dispatchEvent(new Event('input',{bubbles:true}));
+  if(m.pt&&el.dataset.t&&cur){const row=cur.t[el.dataset.t][+el.dataset.r]; if(row){row[el.dataset.c+'Pt']=m.pt; queueSave()}}
+  el.focus()}
 // Google Drive: files go to "Trip runbook/<trip>" in the Drive of whoever is signed in.
 // Set GOOGLE_CLIENT_ID to an OAuth web client ID whose authorised JavaScript origin is this site.
 const GOOGLE_CLIENT_ID='95709746435-c54mg0h49isdfn39p2qnd6re2t6hnn4h.apps.googleusercontent.com';
@@ -18634,8 +18654,93 @@ function legExtrasBrief(l){const x=(l.extra||[]).filter(e=>e.k||e.v).map(e=>`${e
 function cloneLeg(l,person){const c={...l,person}; delete c.files; if(l.extra)c.extra=l.extra.map(x=>({...x})); return c}
 function blankLeg(what,person){return {status:'Gap',what,day:'',local:'',syd:'',where:'',who:'',by:'',ref:'',person:person||undefined}}
 // Overview: a read-only itinerary of every traveller's legs, showing what's booked and what isn't
-function legViewToggleHTML(){const v=cur.legView==='overview'?'overview':'detail';
-  return `<div class="pills legview" role="group" aria-label="View"><button type="button" class="pill" data-legview="detail" aria-pressed="${v==='detail'}">Detailed</button><button type="button" class="pill" data-legview="overview" aria-pressed="${v==='overview'}">Overview</button></div>`}
+function legViewToggleHTML(){const v=['overview','map'].includes(cur.legView)?cur.legView:'detail';
+  return `<div class="pills legview" role="group" aria-label="View"><button type="button" class="pill" data-legview="detail" aria-pressed="${v==='detail'}">Detailed</button><button type="button" class="pill" data-legview="overview" aria-pressed="${v==='overview'}">Overview</button><button type="button" class="pill" data-legview="map" aria-pressed="${v==='map'}">Map</button></div>`}
+// Map: numbered pins for one traveller's legs in journey order, with drive times between them
+let leafletReady=null, mapObj=null; const routeCache=new Map();
+function loadLeaflet(){
+  if(window.L)return Promise.resolve();
+  return leafletReady=leafletReady||new Promise((res,rej)=>{
+    const css=document.createElement('link'); css.rel='stylesheet'; css.href='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'; document.head.appendChild(css);
+    const sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js'; sc.onload=res; sc.onerror=()=>{leafletReady=null; rej(new Error('map'))}; document.head.appendChild(sc)});
+}
+function kmBetween(a,b){const R=6371,r=Math.PI/180, dLat=(b.lat-a.lat)*r, dLon=(b.lon-a.lon)*r, h=Math.sin(dLat/2)**2+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dLon/2)**2; return 2*R*Math.asin(Math.sqrt(h))}
+function fmtMins(s){const m=Math.round(s/60); return m<60?`${m} min`:`${Math.floor(m/60)} hr${m%60?` ${m%60} min`:''}`}
+function dirUrl(a,b){return `https://www.google.com/maps/dir/?api=1&origin=${a.lat},${a.lon}&destination=${b.lat},${b.lon}`}
+async function driveRoute(a,b){
+  const key=[a.lat,a.lon,b.lat,b.lon].map(x=>x.toFixed(5)).join(','); if(routeCache.has(key))return routeCache.get(key);
+  const pr=fetch(`https://routing.openstreetmap.de/routed-car/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?overview=full&geometries=geojson`).then(r=>r.ok?r.json():null)
+    .then(j=>j&&j.routes&&j.routes[0]?{secs:j.routes[0].duration,km:j.routes[0].distance/1000,line:j.routes[0].geometry.coordinates.map(c=>[c[1],c[0]])}:null).catch(()=>null);
+  routeCache.set(key,pr); pr.then(v=>{if(!v)routeCache.delete(key)}); return pr;
+}
+const FLIGHT_KM=400;
+function legMapHTML(){
+  const P=legPerson(); if(!P)return '<p class="status">Add travellers in Intake first.</p>';
+  const tr=(cur.t.travellers||[]).filter(r=>r.name);
+  queueMicrotask(initLegMap);
+  return `<label class="f" style="max-width:24rem;margin-bottom:.9rem;font-size:.95rem;color:var(--ink);font-weight:600">Route for<select data-legsel="1">${tr.map(r=>`<option value="${esc(r.name)}" ${r.name===P?'selected':''}>${esc(r.name)}</option>`).join('')}</select></label>
+    <div class="row" style="margin-bottom:.5rem"><button type="button" class="btn" id="mapAll">Whole trip</button><span class="status">Tap a stretch below to zoom in on it.</span></div>
+    <div id="legMap" class="legmap" role="region" aria-label="Map of ${esc(P)}’s legs"><p class="status" style="padding:1rem">Loading map…</p></div>
+    <div id="legMapNote" class="status" style="margin:.5rem 0 0"></div>
+    <h3 class="map-h">Getting between stops</h3><ol id="legSegs" class="segs"></ol>
+    <h3 class="map-h">How long from one place to another?</h3>
+    <div class="row mapcheck"><select id="mcFrom" aria-label="From"></select><span>to</span><select id="mcTo" aria-label="To"></select><button type="button" class="btn primary" id="mcGo">Check</button></div>
+    <p id="mcOut" class="status" style="margin-top:.5rem"></p>`;
+}
+let mapStops=[], mapAllBounds=null;
+function mapZoom(pts){if(mapObj&&pts.length)mapObj.fitBounds(L.latLngBounds(pts).pad(.2),{maxZoom:15})}
+async function initLegMap(){
+  const box=document.getElementById('legMap'); if(!box)return; const trip=cur, P=legPerson();
+  const legs=legsOf(P).filter(l=>(l.where||'').trim());
+  const note=document.getElementById('legMapNote');
+  // Places typed before pins were saved: look them up once, near the trip's cities
+  const missing=legs.filter(l=>!l.wherePt);
+  if(missing.length){note.textContent=`Finding ${missing.length} place${missing.length>1?'s':''} on the map…`;
+    const pts=await placeBiasPoints().catch(()=>[PLACE_HOME]);
+    await Promise.all(missing.map(l=>fetch(`https://photon.komoot.io/api/?limit=1&lang=en&zoom=12&lat=${pts[0].lat}&lon=${pts[0].lon}&q=${encodeURIComponent(l.where)}`)
+      .then(r=>r.ok?r.json():null).then(j=>{const g=j&&j.features&&j.features[0]&&j.features[0].geometry; if(g)l.wherePt={lat:g.coordinates[1],lon:g.coordinates[0],approx:true}}).catch(()=>{})));
+    if(cur===trip)queueSave();
+  }
+  if(document.getElementById('legMap')!==box)return;
+  // Group legs at the same spot (e.g. lounge and flight at one airport) into one stop
+  mapStops=[]; for(const l of legs){if(!l.wherePt)continue; const last=mapStops[mapStops.length-1];
+    if(last&&kmBetween(last.pt,l.wherePt)<0.3)last.legs.push(l); else mapStops.push({pt:l.wherePt,where:l.where,legs:[l]})}
+  const lost=legs.filter(l=>!l.wherePt), approx=legs.filter(l=>l.wherePt&&l.wherePt.approx);
+  note.innerHTML=[!legs.length?'No places entered for this person yet. Add them under “Where” in the Detailed view.':'',
+    lost.length?`Couldn’t find on the map: ${lost.map(l=>esc(l.what)).join(', ')}. Pick the place from the suggestions in the Detailed view.`:'',
+    approx.length?`${approx.length} place${approx.length>1?'s were':' was'} placed as a best guess from the typed text. Re-pick from the suggestions if one looks wrong.`:''].filter(Boolean).join(' ');
+  try{await loadLeaflet()}catch(_){box.innerHTML='<p class="status" style="padding:1rem">The map couldn’t load on this connection.</p>';return}
+  if(document.getElementById('legMap')!==box)return;
+  if(mapObj){mapObj.remove(); mapObj=null} box.innerHTML='';
+  const map=mapObj=L.map(box,{scrollWheelZoom:false}); L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);
+  const when=l=>[/^\d{4}-\d\d-\d\d$/.test(l.day||'')?dayLabel(l.day):l.day,l.local].filter(Boolean).join(' · ');
+  mapStops.forEach((st,i)=>{
+    const gap=st.legs.some(l=>(l.status||'Gap')==='Gap');
+    L.marker([st.pt.lat,st.pt.lon],{icon:L.divIcon({className:'',html:`<span class="pin ${gap?'pin-gap':''}">${i+1}</span>`,iconSize:[28,28],iconAnchor:[14,14]})}).addTo(map)
+      .bindPopup(`<b>${i+1}. ${esc(st.where)}</b>${st.legs.map(l=>`<br>${esc(l.what)}${when(l)?` · ${esc(when(l))}`:''} · ${(l.status||'Gap')==='Gap'?'Not booked':esc(l.status)}`).join('')}`);
+  });
+  mapAllBounds=mapStops.map(s=>[s.pt.lat,s.pt.lon]);
+  if(mapStops.length)map.fitBounds(L.latLngBounds(mapAllBounds).pad(.15),{maxZoom:14}); else map.setView([PLACE_HOME.lat,PLACE_HOME.lon],10);
+  const segs=document.getElementById('legSegs'); segs.innerHTML=mapStops.length<2?'<li class="status">Add at least two places to see travel times.</li>':'';
+  for(let i=0;i<mapStops.length-1;i++){const a=mapStops[i], b=mapStops[i+1], km=kmBetween(a.pt,b.pt);
+    const li=document.createElement('li'); li.dataset.zoom=JSON.stringify([[a.pt.lat,a.pt.lon],[b.pt.lat,b.pt.lon]]); li.innerHTML=`<span class="seg-n">${i+1} → ${i+2}</span><span class="seg-p">${esc(a.where)} <span class="status">to</span> ${esc(b.where)}</span><span class="seg-t">${km>FLIGHT_KM?`Flight · about ${Math.round(km).toLocaleString()} km`:'Working out drive…'}</span>${km>FLIGHT_KM?'':`<a href="${esc(dirUrl(a.pt,b.pt))}" target="_blank" rel="noopener">Directions</a>`}`; segs.appendChild(li);
+    if(km>FLIGHT_KM){L.polyline([[a.pt.lat,a.pt.lon],[b.pt.lat,b.pt.lon]],{color:'#5A6A6D',weight:2,dashArray:'6 8'}).addTo(map); continue}
+    driveRoute(a.pt,b.pt).then(r=>{if(mapObj!==map)return; const t=li.querySelector('.seg-t');
+      if(r){t.textContent=`Drive · ${fmtMins(r.secs)} · ${r.km<10?r.km.toFixed(1):Math.round(r.km)} km`; li.dataset.zoom=JSON.stringify(r.line.filter((_,k)=>k%10===0).concat([r.line[r.line.length-1]])); L.polyline(r.line,{color:'#0E6E62',weight:4,opacity:.85}).addTo(map)}
+      else{t.textContent='Drive time unavailable'; L.polyline([[a.pt.lat,a.pt.lon],[b.pt.lat,b.pt.lon]],{color:'#0E6E62',weight:3,dashArray:'2 6'}).addTo(map)}});
+  }
+  const opts=mapStops.map((s,i)=>`<option value="${i}">${i+1}. ${esc(s.where)}</option>`).join('');
+  const f=document.getElementById('mcFrom'), t=document.getElementById('mcTo'); f.innerHTML=opts; t.innerHTML=opts; if(mapStops.length>1)t.value=String(mapStops.length-1);
+}
+async function mapCheck(){
+  const a=mapStops[+document.getElementById('mcFrom').value], b=mapStops[+document.getElementById('mcTo').value], out=document.getElementById('mcOut'); if(!a||!b)return;
+  if(a===b){out.textContent='Pick two different places.';return}
+  const km=kmBetween(a.pt,b.pt), link=`<a href="${esc(dirUrl(a.pt,b.pt))}" target="_blank" rel="noopener">Open in Google Maps</a> for live traffic.`;
+  mapZoom([[a.pt.lat,a.pt.lon],[b.pt.lat,b.pt.lon]]);
+  if(km>FLIGHT_KM){out.innerHTML=`About ${Math.round(km).toLocaleString()} km in a straight line, so this is a flight, not a drive. ${link}`;return}
+  out.textContent='Working it out…'; const r=await driveRoute(a.pt,b.pt);
+  out.innerHTML=r?`<b>About ${fmtMins(r.secs)}</b> by car (${r.km<10?r.km.toFixed(1):Math.round(r.km)} km), without traffic. ${link}`:`Couldn’t work out a drive time. ${link}`;
+}
 function legOverviewHTML(){
   if(!legPerson())return '<p class="status">Add travellers in Intake first.</p>';
   const people=(cur.t.travellers||[]).map(r=>r.name).filter(Boolean), flt=cur.legFilter||'all';
@@ -18696,7 +18801,7 @@ function renderStep(){
     if(b.type==='note'){html+=`<section class="block note">${b.html}</section>`;return}
     html+=`<section class="block">${b.title&&b.type!=='flights'?`<h2>${esc(titleCase(b.title))}</h2>`:''}`;
     if(b.type==='fields')html+=`<div class="grid">${b.fields.map(fieldHTML).join('')}</div>`;
-    if(b.type==='table'&&b.perPerson)html+=legViewToggleHTML()+(cur.legView==='overview'?legOverviewHTML():legTabsHTML()+legStartHTML()+tableHTML(b)+legCopyHTML());
+    if(b.type==='table'&&b.perPerson)html+=legViewToggleHTML()+(cur.legView==='overview'?legOverviewHTML():cur.legView==='map'?legMapHTML():legTabsHTML()+legStartHTML()+tableHTML(b)+legCopyHTML());
     else if(b.type==='table')html+=tableHTML(b);
     if(b.type==='flights')html+=flightAddHTML()+tableHTML(b);
     if(b.type==='checks')html+=`<ul class="checks">${b.items.map((it,ii)=>{const k=`${s.id}.${bi}.${ii}`;return `<li><label><input type="checkbox" data-check="${k}" ${cur.c[k]?'checked':''}><span>${esc(it)}</span></label></li>`}).join('')}</ul>`;
@@ -18833,7 +18938,7 @@ document.addEventListener('input',e=>{
   if(el.dataset.t!==undefined){const row=cur.t[el.dataset.t][+el.dataset.r]; row[el.dataset.c]=el.value;
     if(el.dataset.t==='flights'&&el.dataset.c==='ref'&&el.value.trim()&&(row.status||'Gap')==='Gap'){row.status='Booked'; const ss=el.closest('tr,.legcard').querySelector('[data-c="status"]'); if(ss)ss.value='Booked'; el.closest('tr,.legcard').classList.remove('is-gap')}
     if(el.dataset.c==='status'){el.closest('tr,.legcard').classList.toggle('is-gap',el.value==='Gap')}
-    {const ml=el.parentElement&&el.parentElement.querySelector('.maplink'); if(ml){ml.href=mapUrl(el.value); ml.hidden=!el.value.trim(); if(document.activeElement===el)queuePlaces(el); else placeSkip=false}}
+    {const ml=el.parentElement&&el.parentElement.querySelector('.maplink'); if(ml){delete row[el.dataset.c+'Pt']; ml.href=mapUrl(el.value); ml.hidden=!el.value.trim(); if(document.activeElement===el)queuePlaces(el); else placeSkip=false}}
     if(el.dataset.citycell&&document.activeElement===el)showCellCities(el);
     queueSave(); refreshDerived(); return}
   if(el.dataset.check!==undefined){if(el.checked)cur.c[el.dataset.check]=true; else delete cur.c[el.dataset.check]; queueSave(); renderRail()}
@@ -18922,6 +19027,9 @@ document.addEventListener('click',async e=>{
   const add=e.target.closest('[data-add]');
   if(add){const key=add.dataset.add; const blk=STEPS.flatMap(s=>s.blocks).find(b=>b.key===key);
     const row={}; blk.cols.forEach(c=>row[c.k]=c.type==='select'?(typeof c.options==='function'?c.options():c.options)[0]:''); if(blk.perPerson&&legPerson())row.person=legPerson(); cur.t[key].push(row); queueSave(); renderStep(); refreshDerived(); return}
+  if(e.target.id==='mcGo'){mapCheck();return}
+  if(e.target.id==='mapAll'){mapZoom(mapAllBounds||[]);return}
+  const sz=!e.target.closest('a')&&e.target.closest('#legSegs li[data-zoom]'); if(sz){mapZoom(JSON.parse(sz.dataset.zoom)); document.getElementById('legMap').scrollIntoView({behavior:'smooth',block:'center'}); return}
   const lv=e.target.closest('[data-legview]'); if(lv&&cur){cur.legView=lv.dataset.legview; queueSave(); renderStep(); return}
   const lfi=e.target.closest('[data-legfilter]'); if(lfi&&cur){cur.legFilter=lfi.dataset.legfilter; queueSave(); renderStep(); return}
   const le=e.target.closest('[data-legedit]'); if(le&&cur){cur.legView='detail'; cur.legP=le.dataset.legedit; queueSave(); renderStep(); return}
