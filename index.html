@@ -189,6 +189,32 @@ table.ed td.nm{font-weight:600;vertical-align:middle;padding-left:.4rem;color:va
 .citylist li.msg{justify-content:flex-start;font-size:.85rem;white-space:normal}
 .citylist li .pl{display:flex;flex-direction:column;min-width:0}
 .citylist li .pl small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.legview{margin-bottom:1rem}
+.ov-sum{margin:0 0 .6rem;font-size:1rem}
+.ov-todo{color:var(--gap);font-weight:600}
+.ov-ok{color:var(--accent);font-weight:600}
+.ov-person{margin-bottom:1.25rem}
+.ov-head{display:flex;align-items:center;gap:.75rem;padding-bottom:.4rem;border-bottom:1px solid var(--line)}
+.ov-head h3{margin:0;font-size:1.05rem}
+.ov-head .ov-edit{margin-left:auto;color:var(--accent);padding:.25rem .6rem}
+.ov-list{list-style:none;margin:0;padding:0}
+.ov-list li{display:grid;grid-template-columns:7.5rem minmax(0,2fr) minmax(0,1fr) minmax(0,1.2fr);gap:.75rem;align-items:center;padding:.55rem 0;border-bottom:1px solid var(--line);font-size:.92rem}
+.ov-what{display:flex;flex-direction:column;min-width:0}
+.ov-what b{font-weight:600}
+.ov-what span,.ov-by,.ov-when{color:var(--muted);overflow-wrap:anywhere}
+.ov-none{font-style:italic}
+.ov-badge{justify-self:start;font-size:.78rem;font-weight:600;border-radius:999px;padding:.15rem .6rem;white-space:nowrap}
+.ov-gap{color:var(--gap);border:1px solid var(--gap)}
+.ov-book{color:var(--accent);border:1px solid var(--accent)}
+.ov-conf{background:var(--accent);color:var(--accent-ink);border:1px solid var(--accent)}
+.ov-self{color:var(--muted);border:1px dashed var(--muted)}
+.ov-files{white-space:nowrap}
+@media (max-width:600px){
+  .ov-list li{grid-template-columns:minmax(0,1fr) auto;gap:.2rem .75rem}
+  .ov-list .ov-badge{grid-column:2;grid-row:1}
+  .ov-list .ov-what{grid-column:1;grid-row:1}
+  .ov-list .ov-when,.ov-list .ov-by{grid-column:1/-1}
+}
 .legcards{display:flex;flex-direction:column;gap:1rem}
 .legcard{border:1px solid var(--line);border-radius:10px;padding:1rem 1.1rem;background:var(--bg)}
 .legcard.is-gap{border-left:4px solid var(--gap)}
@@ -18607,6 +18633,22 @@ function legExtrasBrief(l){const x=(l.extra||[]).filter(e=>e.k||e.v).map(e=>`${e
   return x.length||f.length?`<div style="color:#5A6A6D;font-size:10.5px;margin-top:2px">${[...x,...(f.length?['Files: '+f.join(', ')]:[])].join('<br>')}</div>`:''}
 function cloneLeg(l,person){const c={...l,person}; delete c.files; if(l.extra)c.extra=l.extra.map(x=>({...x})); return c}
 function blankLeg(what,person){return {status:'Gap',what,day:'',local:'',syd:'',where:'',who:'',by:'',ref:'',person:person||undefined}}
+// Overview: a read-only itinerary of every traveller's legs, showing what's booked and what isn't
+function legViewToggleHTML(){const v=cur.legView==='overview'?'overview':'detail';
+  return `<div class="pills legview" role="group" aria-label="View"><button type="button" class="pill" data-legview="detail" aria-pressed="${v==='detail'}">Detailed</button><button type="button" class="pill" data-legview="overview" aria-pressed="${v==='overview'}">Overview</button></div>`}
+function legOverviewHTML(){
+  if(!legPerson())return '<p class="status">Add travellers in Intake first.</p>';
+  const people=(cur.t.travellers||[]).map(r=>r.name).filter(Boolean), flt=cur.legFilter||'all';
+  const isGap=l=>(l.status||'Gap')==='Gap', all=people.flatMap(legsOf), gaps=all.filter(isGap).length;
+  const when=l=>[/^\d{4}-\d\d-\d\d$/.test(l.day||'')?dayLabel(l.day):l.day,l.local].filter(Boolean).join(' · ');
+  const badge=l=>{const st=l.status||'Gap'; return `<span class="ov-badge ov-${st==='Gap'?'gap':st==='Confirmed'?'conf':st==='Booked'?'book':'self'}">${st==='Gap'?'Not booked':esc(st)}</span>`};
+  const groups=people.map(n=>{const ls=legsOf(n), g=ls.filter(isGap).length, show=ls.filter(l=>flt==='all'||(flt==='gap')===isGap(l)); if(!show.length)return '';
+    return `<div class="ov-person"><div class="ov-head"><h3>${esc(n)}</h3><span class="${g?'ov-todo':'ov-ok'}">${g?`${g} to book`:'All booked'}</span><button type="button" class="btn quiet ov-edit" data-legedit="${esc(n)}">Edit</button></div>
+      <ol class="ov-list">${show.map(l=>`<li class="${isGap(l)?'is-gap':''}">${badge(l)}<div class="ov-what"><b>${esc(l.what||'Untitled leg')}</b>${l.where?`<span>${esc(l.where)}</span>`:''}</div><div class="ov-when">${esc(when(l))||'<span class="ov-none">No date yet</span>'}</div><div class="ov-by">${isGap(l)?'':esc([l.by,l.ref?'Ref '+l.ref:''].filter(Boolean).join(' · '))}${(l.files||[]).length?` <span class="ov-files" title="${esc(l.files.map(f=>f.name).join(', '))}">📎 ${l.files.length}</span>`:''}</div></li>`).join('')}</ol></div>`}).join('');
+  return `<p class="ov-sum"><b>${all.length-gaps} of ${all.length}</b> legs booked${gaps?` · <span class="ov-todo">${gaps} still to book</span>`:' · everything covered'}</p>
+    <div class="pills" style="margin-bottom:1rem">${[['all','All legs'],['gap','Not booked'],['done','Booked']].map(([k,t])=>`<button type="button" class="pill" data-legfilter="${k}" aria-pressed="${flt===k}">${t}</button>`).join('')}</div>
+    ${groups||'<p class="status">Nothing to show for this filter.</p>'}`;
+}
 function legTabsHTML(){
   const P=legPerson(); if(!P)return '';
   const tr=(cur.t.travellers||[]).filter(r=>r.name);
@@ -18654,7 +18696,8 @@ function renderStep(){
     if(b.type==='note'){html+=`<section class="block note">${b.html}</section>`;return}
     html+=`<section class="block">${b.title&&b.type!=='flights'?`<h2>${esc(titleCase(b.title))}</h2>`:''}`;
     if(b.type==='fields')html+=`<div class="grid">${b.fields.map(fieldHTML).join('')}</div>`;
-    if(b.type==='table')html+=(b.perPerson?legTabsHTML()+legStartHTML():'')+tableHTML(b)+(b.perPerson?legCopyHTML():'');
+    if(b.type==='table'&&b.perPerson)html+=legViewToggleHTML()+(cur.legView==='overview'?legOverviewHTML():legTabsHTML()+legStartHTML()+tableHTML(b)+legCopyHTML());
+    else if(b.type==='table')html+=tableHTML(b);
     if(b.type==='flights')html+=flightAddHTML()+tableHTML(b);
     if(b.type==='checks')html+=`<ul class="checks">${b.items.map((it,ii)=>{const k=`${s.id}.${bi}.${ii}`;return `<li><label><input type="checkbox" data-check="${k}" ${cur.c[k]?'checked':''}><span>${esc(it)}</span></label></li>`}).join('')}</ul>`;
     if(b.type==='countries'){const cs=routeCountries(),un=unlistedCities();
@@ -18879,6 +18922,9 @@ document.addEventListener('click',async e=>{
   const add=e.target.closest('[data-add]');
   if(add){const key=add.dataset.add; const blk=STEPS.flatMap(s=>s.blocks).find(b=>b.key===key);
     const row={}; blk.cols.forEach(c=>row[c.k]=c.type==='select'?(typeof c.options==='function'?c.options():c.options)[0]:''); if(blk.perPerson&&legPerson())row.person=legPerson(); cur.t[key].push(row); queueSave(); renderStep(); refreshDerived(); return}
+  const lv=e.target.closest('[data-legview]'); if(lv&&cur){cur.legView=lv.dataset.legview; queueSave(); renderStep(); return}
+  const lfi=e.target.closest('[data-legfilter]'); if(lfi&&cur){cur.legFilter=lfi.dataset.legfilter; queueSave(); renderStep(); return}
+  const le=e.target.closest('[data-legedit]'); if(le&&cur){cur.legView='detail'; cur.legP=le.dataset.legedit; queueSave(); renderStep(); return}
   const lxa=e.target.closest('[data-lxadd]'); if(lxa&&cur){const l=cur.t.legs[+lxa.dataset.lxadd]; (l.extra=l.extra||[]).push({k:'',v:''}); queueSave(); renderStep(); const ins=document.querySelectorAll(`[data-lx^="${lxa.dataset.lxadd}:${l.extra.length-1}:k"]`); if(ins[0])ins[0].focus(); return}
   const lxd=e.target.closest('[data-lxdel]'); if(lxd&&cur){const [ri,i]=lxd.dataset.lxdel.split(':'); cur.t.legs[+ri].extra.splice(+i,1); queueSave(); renderStep(); return}
   const lfd=e.target.closest('[data-lfdel]'); if(lfd&&cur){const [ri,i]=lfd.dataset.lfdel.split(':'); const l=cur.t.legs[+ri]; if(!confirm(`Remove “${l.files[+i].name}” from this leg? The file stays in Google Drive.`))return; l.files.splice(+i,1); queueSave(); renderStep(); return}
