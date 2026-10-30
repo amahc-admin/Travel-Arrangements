@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Trip runbook</title>
+<title>Trip Runbook</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
@@ -230,12 +230,12 @@ table.ed td.nm{font-weight:600;vertical-align:middle;padding-left:.4rem;color:va
 </head>
 <body>
 <header class="top">
-  <div class="brand">Trip runbook<small>Jaya’s travel, door to door</small></div>
+  <div class="brand">Trip Runbook<small>Jaya’s Travel, Door to Door</small></div>
   <select id="tripSelect" aria-label="Choose a trip"></select>
-  <button class="btn" id="newTrip">New trip</button>
-  <button class="btn primary" id="dlTop">Download trip brief</button>
-  <button class="btn quiet" id="delTrip">Delete trip</button>
-  <button class="btn quiet" id="backup">Back up</button>
+  <button class="btn" id="newTrip">New Trip</button>
+  <button class="btn primary" id="dlTop">Download Trip Brief</button>
+  <button class="btn quiet" id="delTrip">Delete Trip</button>
+  <button class="btn quiet" id="backup">Back Up</button>
   <button class="btn quiet" id="restoreBtn">Restore</button>
   <input type="file" id="restoreFile" accept=".json,application/json" hidden>
   <span class="save-state" id="saveState" aria-live="polite"></span>
@@ -18311,11 +18311,15 @@ let trips=[]; let cur=null; let db=null; let uid=null; let downloads=null;
 const LS='tripRunbook.v1';
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// Headings in Title Case: capitalise each word except short joining words ("Door to Door")
+const SMALL_WORDS=new Set('a an and as at but by for from in into nor of on or per the to vs via with'.split(' '));
+function titleCase(s){return String(s??'').replace(/[A-Za-z][\w’'-]*/g,(w,i,str)=>i>0&&SMALL_WORDS.has(w.toLowerCase())&&!/[:–—]\s*$/.test(str.slice(0,i))?w:w[0].toUpperCase()+w.slice(1))}
 function setSave(t){$('#saveState').textContent=t}
 function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');clearTimeout(toast._t);toast._t=setTimeout(()=>el.classList.remove('show'),2600)}
 
 function lsLoad(){try{return JSON.parse(localStorage.getItem(LS)||'[]')}catch(e){return []}}
-function lsSave(){try{localStorage.setItem(LS,JSON.stringify(trips))}catch(e){}}
+function lsSave(){try{localStorage.setItem(LS,JSON.stringify(trips)); if(cur)localStorage.setItem(LS+'.open',cur.id); return true}
+  catch(e){setSave('Not saved: this browser is blocking storage'); toast('Couldn’t save on this device. Use Back Up to keep a copy'); return false}}
 
 let saveTimer=null;
 function queueSave(){
@@ -18323,7 +18327,8 @@ function queueSave(){
   clearTimeout(saveTimer); saveTimer=setTimeout(()=>persist(cur),700);
 }
 async function persist(trip){
-  lsSave();
+  clearTimeout(saveTimer); saveTimer=null;
+  if(!lsSave())return;
   if(db&&uid){
     try{await db.collection('data/users/'+uid).doc(trip.id).set(JSON.parse(JSON.stringify(trip))); setSave('Saved')}
     catch(e){setSave('Saved on this device')}
@@ -18516,7 +18521,7 @@ function renderRail(){
   fixStep();
   $('#rail').innerHTML=visSteps().map(i=>{ const s=STEPS[i];
     const p=stepProgress(i); const cls=[i===cur.step?'current':'', p.total&&p.done===p.total?'done':(p.done?'part':'')].join(' ');
-    return `<li class="${cls}"><button data-go="${i}" ${i===cur.step?'aria-current="step"':''}><span class="stop" aria-hidden="true"></span><span><span class="lbl">${esc(s.title)}</span><span class="when">${esc(s.when)}${p.total?` · ${p.done} of ${p.total}`:''}</span></span></button></li>`;
+    return `<li class="${cls}"><button data-go="${i}" ${i===cur.step?'aria-current="step"':''}><span class="stop" aria-hidden="true"></span><span><span class="lbl">${esc(titleCase(s.title))}</span><span class="when">${esc(s.when)}${p.total?` · ${p.done} of ${p.total}`:''}</span></span></button></li>`;
   }).join('');
 }
 function fieldHTML(f){
@@ -18602,7 +18607,7 @@ function blankLeg(what,person){return {status:'Gap',what,day:'',local:'',syd:'',
 function legTabsHTML(){
   const P=legPerson(); if(!P)return '';
   const tr=(cur.t.travellers||[]).filter(r=>r.name);
-  return `<label class="f" style="max-width:24rem;margin-bottom:.9rem;font-size:.95rem;color:var(--ink);font-weight:600">Door to door for<select data-legsel="1">${tr.map(r=>{const ls=legsOf(r.name); const g=ls.filter(l=>(l.status||'Gap')==='Gap').length;
+  return `<label class="f" style="max-width:24rem;margin-bottom:.9rem;font-size:.95rem;color:var(--ink);font-weight:600">Door to Door for<select data-legsel="1">${tr.map(r=>{const ls=legsOf(r.name); const g=ls.filter(l=>(l.status||'Gap')==='Gap').length;
     return `<option value="${esc(r.name)}" ${r.name===P?'selected':''}>${esc(r.name)}${ls.length?(g?` (${g} gap${g>1?'s':''})`:' (all covered)'):' (no legs yet)'}</option>`}).join('')}</select></label>`;
 }
 function legCopyHTML(){
@@ -18638,13 +18643,13 @@ function gapsHTML(){
 }
 function renderStep(){
   const main=$('#main');
-  if(!cur){main.innerHTML=`<div class="empty"><h1>Start a trip</h1><p class="lead">Each trip gets its own checklist, door-to-door plan and trip brief. Your progress saves as you go.</p><button class="btn primary" id="startTrip">Start a trip</button></div>`;return}
+  if(!cur){main.innerHTML=`<div class="empty"><h1>Start a Trip</h1><p class="lead">Each trip gets its own checklist, door-to-door plan and trip brief. Your progress saves as you go.</p><button class="btn primary" id="startTrip">Start a trip</button></div>`;return}
   fixStep(); const s=STEPS[cur.step]; const V=visSteps(); const pos=V.indexOf(cur.step); const prev=V[pos-1], next=V[pos+1];
-  let html=`<div class="step-head"><div class="step-num">Step ${pos+1} of ${V.length}</div><h1>${esc(s.title)}</h1><p class="lead">${esc(s.lead)}</p></div>`;
+  let html=`<div class="step-head"><div class="step-num">Step ${pos+1} of ${V.length}</div><h1>${esc(titleCase(s.title))}</h1><p class="lead">${esc(s.lead)}</p></div>`;
   s.blocks.forEach((b,bi)=>{
     if(!shows(b))return;
     if(b.type==='note'){html+=`<section class="block note">${b.html}</section>`;return}
-    html+=`<section class="block">${b.title&&b.type!=='flights'?`<h2>${esc(b.title)}</h2>`:''}`;
+    html+=`<section class="block">${b.title&&b.type!=='flights'?`<h2>${esc(titleCase(b.title))}</h2>`:''}`;
     if(b.type==='fields')html+=`<div class="grid">${b.fields.map(fieldHTML).join('')}</div>`;
     if(b.type==='table')html+=(b.perPerson?legTabsHTML()+legStartHTML():'')+tableHTML(b)+(b.perPerson?legCopyHTML():'');
     if(b.type==='flights')html+=flightAddHTML()+tableHTML(b);
@@ -18659,8 +18664,8 @@ function renderStep(){
     if(b.type==='brief')html+=`<h2>Preview</h2><div class="row" style="margin-bottom:.75rem"><button class="btn primary" id="dlPdf">Download ${isTeam()?'full team':'trip'} brief PDF</button><span class="status" id="pdfStatus"></span></div>${isTeam()?`<p class="status" style="margin:0">Personal briefs (only that person’s flights, room, legs and reservations):</p><div class="pbriefs">${(cur.t.travellers||[]).map((r,i)=>r.name?`<button class="btn" data-pbrief="${i}">${esc(r.name)}</button>`:'').join('')||'<span class="status">Add names in the Travellers table first.</span>'}</div>`:''}<div class="brief-wrap"><div id="brief" class="briefdoc">${briefHTML()}</div></div>`;
     html+='</section>';
   });
-  html+=`<div class="nav-foot"><button class="btn" data-go="${prev??-1}" ${prev===undefined?'disabled':''}>Previous step</button>${next!==undefined?`<button class="btn primary" data-go="${next}">Next: ${esc(STEPS[next].title)}</button>`:''}</div>`;
-  main.innerHTML=html;
+  html+=`<div class="nav-foot"><button class="btn" data-go="${prev??-1}" ${prev===undefined?'disabled':''}>Previous step</button>${next!==undefined?`<button class="btn primary" data-go="${next}">Next: ${esc(titleCase(STEPS[next].title))}</button>`:''}</div>`;
+  main.innerHTML=html.replace(/<h([12])>([^<]*)<\/h\1>/g,(m,n,t)=>`<h${n}>${titleCase(t)}</h${n}>`);
 }
 function refreshDerived(){
   renderRail();
@@ -18675,7 +18680,8 @@ function renderAll(){calView=null;renderTripSelect();renderRail();renderStep()}
 
 /* ---------- trip brief ---------- */
 function B(v){return v?esc(v):'<span class="blank">[blank]</span>'}
-function briefHTML(pi=null){
+function briefHTML(pi=null){return briefBody(pi).replace(/<h2>([^<]*)<\/h2>/g,(m,t)=>'<h2>'+titleCase(t)+'</h2>')}
+function briefBody(pi=null){
   const f=cur.f,t=cur.t; const team=isTeam(); const multi=(t.travellers||[]).filter(r=>r.name).length>1;
   const P=pi!=null?(t.travellers||[])[pi]:null; const pname=P?P.name||'':'';
   const fdate=d=>d?dayLabel(d):'';
@@ -18888,7 +18894,7 @@ document.addEventListener('click',async e=>{
 function startNew(){const t=newTrip(); trips.push(t); cur=t; persist(t); renderAll(); const n=document.querySelector('[data-f="tripName"]'); if(n)n.focus()}
 $('#newTrip').addEventListener('click',startNew);
 $('#dlTop').addEventListener('click',downloadPdf);
-$('#tripSelect').addEventListener('change',e=>{cur=trips.find(t=>t.id===e.target.value)||null;renderAll()});
+$('#tripSelect').addEventListener('change',e=>{cur=trips.find(t=>t.id===e.target.value)||null; try{if(cur)localStorage.setItem(LS+'.open',cur.id)}catch(_){} renderAll()});
 $('#delTrip').addEventListener('click',async()=>{
   if(!cur)return; if(!confirm(`Delete “${tripName(cur)}”? This can’t be undone.`))return;
   await removeTrip(cur); cur=trips.slice().sort((a,b)=>b.updated-a.updated)[0]||null; renderAll(); toast('Trip deleted');
@@ -18927,7 +18933,14 @@ window.addEventListener('scroll',e=>{hideCellList(); if(!(e.target&&e.target.id=
 window.addEventListener('resize',positionPlaceList);
 window.addEventListener('resize',()=>hideCellList());
 /* ---------- boot ---------- */
-trips=lsLoad(); cur=trips.slice().sort((a,b)=>b.updated-a.updated)[0]||null; renderAll();
+// Save straight away when the tab is hidden or closed, so nothing typed in the last moment is lost
+function flushSave(){if(saveTimer&&cur)persist(cur)}
+window.addEventListener('pagehide',flushSave);
+window.addEventListener('beforeunload',flushSave);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushSave()});
+// Ask the browser to keep this site's storage instead of clearing it when space is tight
+try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(_){}
+trips=lsLoad(); {let openId=null; try{openId=localStorage.getItem(LS+'.open')}catch(_){} cur=trips.find(t=>t.id===openId)||trips.slice().sort((a,b)=>b.updated-a.updated)[0]||null} renderAll();
 setSave(trips.length?'Saved on this device':'');
 (async()=>{
   try{
