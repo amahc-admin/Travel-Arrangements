@@ -18333,21 +18333,39 @@ function queuePlaces(el){
   clearTimeout(placeTimer); const q=el.value.trim(); if(q.length<3){hidePlaceList();return}
   placeTimer=setTimeout(()=>fetchPlaces(el,q),300);
 }
+// Rank suggestions like a map app: near the trip's destination cities first, then near home (Sydney)
+const PLACE_HOME={lat:-33.8688,lon:151.2093}, cityPoints=new Map();
+async function cityPoint(name){
+  const c=findCity(name), key=c?c.name+'|'+c.country:name; if(cityPoints.has(key))return cityPoints.get(key);
+  const pr=fetch('https://photon.komoot.io/api/?limit=1&lang=en&osm_tag=place&q='+encodeURIComponent(c?c.name+', '+c.country:name))
+    .then(r=>r.ok?r.json():null).then(j=>{const g=j&&j.features&&j.features[0]&&j.features[0].geometry; return g?{lat:g.coordinates[1],lon:g.coordinates[0]}:null}).catch(()=>null);
+  cityPoints.set(key,pr); return pr;
+}
+async function placeBiasPoints(){
+  const pts=(await Promise.all(destList().slice(0,3).map(cityPoint))).filter(Boolean);
+  return [...pts,PLACE_HOME];
+}
 async function fetchPlaces(el,q){
   const seq=++placeSeq;
   try{
-    const r=await fetch('https://photon.komoot.io/api/?limit=7&lang=en&q='+encodeURIComponent(q)); if(!r.ok)return;
-    const j=await r.json(); if(seq!==placeSeq||document.activeElement!==el)return;
-    placeMatches=(j.features||[]).map(f=>{const p=f.properties||{};
+    const pts=await placeBiasPoints(); if(seq!==placeSeq)return;
+    const lists=await Promise.all(pts.map(pt=>fetch('https://photon.komoot.io/api/?limit=5&lang=en&zoom=12&lat='+pt.lat+'&lon='+pt.lon+'&q='+encodeURIComponent(q))
+      .then(r=>r.ok?r.json():{}).then(j=>j.features||[]).catch(()=>[])));
+    if(seq!==placeSeq||document.activeElement!==el)return;
+    const km=(a,g)=>{const x=(g[0]-a.lon)*Math.cos((a.lat+g[1])/2*Math.PI/180), y=g[1]-a.lat; return Math.hypot(x,y)*111};
+    const tier=f=>{const g=f.geometry&&f.geometry.coordinates; if(!g)return pts.length; const i=pts.findIndex(pt=>km(pt,g)<60); return i<0?pts.length:i};
+    const feats=[]; for(let i=0;i<5;i++)for(const l of lists)if(l[i])feats.push(l[i]);
+    feats.sort((a,b)=>tier(a)-tier(b));
+    placeMatches=feats.map(f=>{const p=f.properties||{};
       const street=[p.housenumber,p.street].filter(Boolean).join(' ');
       const name=p.name||street; const city=p.city||p.town||p.village||p.district||p.county||'';
       const parts=[p.name?street:'',city,p.state,p.country].filter(Boolean).filter((x,i,a)=>a.indexOf(x)===i&&x!==name);
       return {name,sub:parts.join(', '),full:[name,...parts.slice(0,3)].filter(Boolean).join(', ')}}).filter(m=>m.name);
-    const seen=new Set(); placeMatches=placeMatches.filter(m=>!seen.has(m.full)&&seen.add(m.full));
+    const seen=new Set(); placeMatches=placeMatches.filter(m=>!seen.has(m.full)&&seen.add(m.full)).slice(0,7);
     if(!placeMatches.length){hidePlaceList();return}
     const ul=placeListEl(); placeTarget=el; placeHi=0;
     ul.innerHTML=placeMatches.map((m,i)=>`<li role="option" data-placepick="${i}" class="${i===0?'on':''}"><span class="pl">${esc(m.name)}<small>${esc(m.sub)}</small></span></li>`).join('')+'<li class="attrib" aria-hidden="true">Places from © OpenStreetMap contributors</li>';
-    const rc=el.getBoundingClientRect(); ul.style.left=rc.left+'px'; ul.style.top=(rc.bottom+4)+'px'; ul.style.right='auto'; ul.style.width=Math.max(rc.width,340)+'px'; ul.hidden=false;
+    const rc=el.getBoundingClientRect(); const vw=document.documentElement.clientWidth, w=Math.min(Math.max(rc.width,340),vw-16); ul.style.left=Math.max(8,Math.min(rc.left,vw-w-8))+'px'; ul.style.top=(rc.bottom+4)+'px'; ul.style.right='auto'; ul.style.width=w+'px'; ul.hidden=false;
   }catch(_){ /* no network here (e.g. inside claude.ai): Map button still works */ }
 }
 function pickPlace(i){const el=placeTarget, m=placeMatches[i]; if(!el||!m)return; hidePlaceList(); placeSkip=true; el.value=m.full; el.dispatchEvent(new Event('input',{bubbles:true})); el.focus()}
