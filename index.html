@@ -149,7 +149,7 @@ table.ed td.x{width:2rem}
 .del{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:1.1rem;line-height:1;padding:.35rem}
 .del:hover{color:var(--gap)}
 .add{margin-top:.6rem}
-tr.is-gap select[data-c="status"]{border-color:var(--gap);color:var(--gap);font-weight:600}
+tr.is-gap select[data-c="status"],.legcard.is-gap select[data-c="status"]{border-color:var(--gap);color:var(--gap);font-weight:600}
 
 .gapline{font-weight:600}
 .gapline.bad{color:var(--gap)}
@@ -186,6 +186,29 @@ table.ed td.nm{font-weight:600;vertical-align:middle;padding-left:.4rem;color:va
 .citylist li.msg{justify-content:flex-start;font-size:.85rem;white-space:normal}
 .citylist li .pl{display:flex;flex-direction:column;min-width:0}
 .citylist li .pl small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.legcards{display:flex;flex-direction:column;gap:1rem}
+.legcard{border:1px solid var(--line);border-radius:10px;padding:1rem 1.1rem;background:var(--bg)}
+.legcard.is-gap{border-left:4px solid var(--gap)}
+.lc-top{display:grid;grid-template-columns:minmax(9rem,12rem) minmax(0,1fr) auto;gap:.75rem;align-items:end}
+.lc-del{align-self:center;margin-top:1.2rem}
+.lc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(12rem,1fr));gap:.85rem .75rem;margin-top:.85rem}
+.lc-wide{grid-column:1/-1}
+.lc-more{margin-top:1rem;padding-top:.85rem;border-top:1px dashed var(--line)}
+.lc-h{font-size:.85rem;font-weight:600;color:var(--muted);margin-bottom:.4rem}
+.lx-row{display:grid;grid-template-columns:minmax(0,12rem) minmax(0,1fr) 2rem;gap:.5rem;align-items:center;margin-bottom:.5rem}
+.lf-list{display:flex;flex-wrap:wrap;gap:.4rem;margin:.25rem 0 .5rem}
+.lf-chip{display:inline-flex;align-items:center;gap:.15rem;max-width:100%;border:1px solid var(--line);border-radius:999px;padding:.1rem .2rem .1rem .7rem;background:var(--surface);font-size:.88rem}
+.lf-chip a{color:var(--accent);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lf-chip a::before{content:"📎 "}
+.lc-acts{gap:.25rem}
+.lc-acts .btn{padding:.35rem .6rem;color:var(--accent)}
+@media (max-width:600px){
+  .lc-top{grid-template-columns:minmax(0,1fr) auto}
+  .lc-top .lc-f:nth-child(2){grid-column:1/-1;grid-row:2}
+  .lx-row{grid-template-columns:minmax(0,1fr) 2rem}
+  .lx-row input[data-lx$=":v"]{grid-column:1;grid-row:2}
+  .lx-row .del{grid-row:1/3;grid-column:2}
+}
 .pbriefs{display:flex;flex-wrap:wrap;gap:.4rem;margin:.25rem 0 .9rem}
 .toast{position:fixed;left:50%;bottom:calc(1.25rem + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:.6rem 1rem;border-radius:8px;font-size:.9rem;opacity:0;pointer-events:none;transition:opacity .2s;z-index:20}
 .toast.show{opacity:1}
@@ -18376,6 +18399,45 @@ async function fetchPlaces(el,q){
   }catch(_){ if(seq===placeSeq&&document.activeElement===el)showPlaceMsg(el,'Can’t reach place suggestions on this connection. Type the address and use Map to check it.') }
 }
 function pickPlace(i){const el=placeTarget, m=placeMatches[i]; if(!el||!m)return; hidePlaceList(); placeSkip=true; el.value=m.full; el.dispatchEvent(new Event('input',{bubbles:true})); el.focus()}
+// Google Drive: files go to "Trip runbook/<trip>" in the Drive of whoever is signed in.
+// Set GOOGLE_CLIENT_ID to an OAuth web client ID whose authorised JavaScript origin is this site.
+const GOOGLE_CLIENT_ID='';
+let gToken=null, gTokenExp=0, gTokenClient=null;
+if(GOOGLE_CLIENT_ID){const sc=document.createElement('script'); sc.src='https://accounts.google.com/gsi/client'; sc.async=true; document.head.appendChild(sc)}
+function driveSignIn(){
+  if(!(window.google&&google.accounts&&google.accounts.oauth2)){toast('Google sign-in is still loading. Try again in a moment');return}
+  gTokenClient=gTokenClient||google.accounts.oauth2.initTokenClient({client_id:GOOGLE_CLIENT_ID,scope:'https://www.googleapis.com/auth/drive.file',callback:r=>{
+    if(r.error){toast('Google sign-in didn’t finish');return}
+    gToken=r.access_token; gTokenExp=Date.now()+(r.expires_in-60)*1000; toast('Connected to Google Drive. Tap Attach file again')}});
+  gTokenClient.requestAccessToken();
+}
+function attachToLeg(leg){
+  if(!GOOGLE_CLIENT_ID){alert('Google Drive isn’t connected to this site yet, so files can’t be uploaded from here.\n\nFor now, upload the file to Google Drive yourself, copy its link, and use “Add link”.');return}
+  if(!gToken||Date.now()>gTokenExp){driveSignIn();return}
+  const fi=document.createElement('input'); fi.type='file'; fi.multiple=true;
+  fi.onchange=async()=>{for(const file of fi.files){
+    toast(`Uploading ${file.name}…`);
+    try{const f=await driveUpload(file,leg); (leg.files=leg.files||[]).push({name:file.name,url:f.webViewLink,id:f.id}); queueSave(); renderStep(); toast(`${file.name} saved to Google Drive`)}
+    catch(err){toast(`Couldn’t upload ${file.name}: ${err.message}`)}}};
+  fi.click();
+}
+async function driveApi(url,opt={}){
+  const r=await fetch(url,{...opt,headers:{...(opt.headers||{}),Authorization:'Bearer '+gToken}});
+  if(r.status===401){gToken=null; throw new Error('Google sign-in expired. Tap Attach file to sign in again')}
+  if(!r.ok)throw new Error('Google Drive said '+r.status); return r.json();
+}
+async function driveFolder(name,parent){
+  const q=`name='${name.replace(/['\\]/g,'\\$&')}' and mimeType='application/vnd.google-apps.folder' and trashed=false`+(parent?` and '${parent}' in parents`:'');
+  const found=await driveApi('https://www.googleapis.com/drive/v3/files?fields=files(id)&q='+encodeURIComponent(q)); if(found.files&&found.files[0])return found.files[0].id;
+  const made=await driveApi('https://www.googleapis.com/drive/v3/files?fields=id',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,mimeType:'application/vnd.google-apps.folder',parents:parent?[parent]:undefined})});
+  return made.id;
+}
+async function driveUpload(file,leg){
+  const root=await driveFolder('Trip runbook'), folder=await driveFolder(tripName(cur)||'Untitled trip',root);
+  const meta={name:[leg.person,leg.what,file.name].filter(Boolean).join(' - '),parents:[folder]};
+  const body=new FormData(); body.append('metadata',new Blob([JSON.stringify(meta)],{type:'application/json'})); body.append('file',file);
+  return driveApi('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink',{method:'POST',body});
+}
 function mapUrl(q){return 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(String(q||'').trim())}
 function travellerNames(t=cur){const n=(t.t.travellers||[]).map(r=>r.name).filter(Boolean); return n.length?n:['Jaya Yoannidis']}
 function flightRows(t=cur){return (t.t.flights||[]).filter(r=>r.flight||r.airline||r.ref||r.date)}
@@ -18470,6 +18532,28 @@ function fieldHTML(f){
   else input=`<input type="${f.type||'text'}" ${attrs} value="${esc(v)}">`;
   return `<label class="f ${f.wide?'wide':''}">${esc(f.label)}${input}</label>`;
 }
+function cellInput(b,c,r,ri){
+  const v=r[c.k]??''; const a=`data-t="${b.key}" data-r="${ri}" data-c="${c.k}" aria-label="${esc(c.label)} row ${ri+1}"`;
+  const base=typeof c.options==='function'?c.options():c.options; const opts=c.type==='select'&&v&&!base.includes(v)?[v,...base]:base;
+  return c.type==='select'?`<select ${a}>${opts.map(o=>`<option ${o===v?'selected':''}>${esc(o)}</option>`).join('')}</select>`:(c.maps?`<div class="mapcell"><input type="text" ${a} autocomplete="off" value="${esc(v)}"><a class="maplink" href="${esc(mapUrl(v))}" target="_blank" rel="noopener" ${String(v).trim()?'':'hidden'} aria-label="Open ${esc(v)} in Google Maps" title="Open in Google Maps">Map</a></div>`:`<input type="${c.type==='date'||c.type==='time'?c.type:'text'}" ${a} ${c.city?'data-citycell="1" autocomplete="off" placeholder="Type a city"':''} value="${esc(v)}">`);
+}
+// Legs as roomy cards: the usual fields, plus extra fields and attached files per leg
+const LEG_FIELD_IDEAS=['Seat','Class','Terminal','Gate','Baggage','Flight number','Frequent flyer','Check-in','Pick-up point','Phone','Notes'];
+function legCardsHTML(b,rows,LP,optBtn){
+  const top=['status','what'], wide=['where'];
+  const cards=rows.map((r,ri)=>{ if(LP&&r.person!==LP)return '';
+    const field=c=>`<label class="f lc-f ${wide.includes(c.k)?'lc-wide':''}">${esc(c.label)}${cellInput(b,c,r,ri)}</label>`;
+    const extra=(r.extra||[]).map((x,i)=>`<div class="lx-row"><input type="text" list="lxIdeas" data-lx="${ri}:${i}:k" value="${esc(x.k)}" placeholder="Field, e.g. Seat" aria-label="Field name"><input type="text" data-lx="${ri}:${i}:v" value="${esc(x.v)}" placeholder="Detail" aria-label="${esc(x.k||'Field')} detail"><button class="del" data-lxdel="${ri}:${i}" aria-label="Remove field ${esc(x.k)}">×</button></div>`).join('');
+    const files=(r.files||[]).map((f,i)=>`<span class="lf-chip"><a href="${esc(f.url)}" target="_blank" rel="noopener" title="${esc(f.name)}">${esc(f.name)}</a><button class="del" data-lfdel="${ri}:${i}" aria-label="Remove ${esc(f.name)}">×</button></span>`).join('');
+    return `<div class="legcard ${(r.status||'Gap')==='Gap'?'is-gap':''}">
+      <div class="lc-top">${b.cols.filter(c=>top.includes(c.k)).map(field).join('')}<button class="del lc-del" data-del="legs:${ri}" aria-label="Remove leg ${ri+1}" title="Remove this leg">×</button></div>
+      <div class="lc-grid">${b.cols.filter(c=>!top.includes(c.k)).map(field).join('')}</div>
+      <div class="lc-more"><div class="lc-h">Extra details</div>${extra}
+        ${files?`<div class="lf-list">${files}</div>`:''}
+        <div class="row lc-acts"><button type="button" class="btn quiet" data-lxadd="${ri}">+ Add field</button><button type="button" class="btn quiet" data-lfattach="${ri}">Attach file</button><button type="button" class="btn quiet" data-lflink="${ri}">Add link</button></div></div>
+    </div>`}).join('');
+  return `<datalist id="lxIdeas">${LEG_FIELD_IDEAS.map(x=>`<option value="${esc(x)}">`).join('')}</datalist><div class="legcards">${cards}</div><div class="row"><button class="btn add" data-add="legs">Add leg</button>${optBtn}</div>`;
+}
 function tableHTML(b0){
   const elig=b0.cols.filter(c=>(!c.team||isTeam())&&(!c.china||cur.f.china==='Yes'));
   const optCols=elig.filter(c=>c.optional); const showOpt=cur.f['opt_'+b0.key]==='Yes';
@@ -18482,11 +18566,8 @@ function tableHTML(b0){
   const minW=sized?`style="min-width:${Math.round(tot*0.8)}rem"`:'';
   const head=b.cols.map(c=>`<th>${esc(c.label)}</th>`).join('')+'<th></th>';
   const LP=b0.perPerson?legPerson():null;
-  const body=rows.map((r,ri)=>(LP&&r.person!==LP)?'':`<tr class="${(b.key==='legs'||b.key==='reservations'||b.key==='flights')&&(r.status||'Gap')==='Gap'?'is-gap':''}">${b.cols.map(c=>{
-     const v=r[c.k]??''; const a=`data-t="${b.key}" data-r="${ri}" data-c="${c.k}" aria-label="${esc(c.label)} row ${ri+1}"`;
-     const base=typeof c.options==='function'?c.options():c.options; const opts=c.type==='select'&&v&&!base.includes(v)?[v,...base]:base;
-     return `<td>${c.type==='select'?`<select ${a}>${opts.map(o=>`<option ${o===v?'selected':''}>${esc(o)}</option>`).join('')}</select>`:(c.maps?`<div class="mapcell"><input type="text" ${a} autocomplete="off" value="${esc(v)}"><a class="maplink" href="${esc(mapUrl(v))}" target="_blank" rel="noopener" ${String(v).trim()?'':'hidden'} aria-label="Open ${esc(v)} in Google Maps" title="Open in Google Maps">Map</a></div>`:`<input type="${c.type==='date'||c.type==='time'?c.type:'text'}" ${a} ${c.city?'data-citycell="1" autocomplete="off" placeholder="Type a city"':''} value="${esc(v)}">`)}</td>`;
-   }).join('')}<td class="x"><button class="del" data-del="${b.key}:${ri}" aria-label="Remove row ${ri+1}">×</button></td></tr>`).join('');
+  if(b.key==='legs')return legCardsHTML(b,rows,LP,optBtn);
+  const body=rows.map((r,ri)=>(LP&&r.person!==LP)?'':`<tr class="${(b.key==='reservations'||b.key==='flights')&&(r.status||'Gap')==='Gap'?'is-gap':''}">${b.cols.map(c=>`<td>${cellInput(b,c,r,ri)}</td>`).join('')}<td class="x"><button class="del" data-del="${b.key}:${ri}" aria-label="Remove row ${ri+1}">×</button></td></tr>`).join('');
   return `<div class="tbl-wrap"><table class="ed" ${minW}>${colg}<thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div><div class="row"><button class="btn add" data-add="${b.key}">Add row</button>${optBtn}</div>`;
 }
 function bookingMessage(){
@@ -18514,6 +18595,9 @@ function legPerson(){
   if(!ns.includes(cur.legP))cur.legP=ns[0]; return cur.legP;
 }
 function legsOf(name){return (cur.t.legs||[]).filter(l=>l.person===name)}
+function legExtrasBrief(l){const x=(l.extra||[]).filter(e=>e.k||e.v).map(e=>`${esc(e.k)}${e.k&&e.v?': ':''}${esc(e.v)}`), f=(l.files||[]).map(f=>`<a href="${esc(f.url)}">${esc(f.name)}</a>`);
+  return x.length||f.length?`<div style="color:#5A6A6D;font-size:10.5px;margin-top:2px">${[...x,...(f.length?['Files: '+f.join(', ')]:[])].join('<br>')}</div>`:''}
+function cloneLeg(l,person){const c={...l,person}; delete c.files; if(l.extra)c.extra=l.extra.map(x=>({...x})); return c}
 function blankLeg(what,person){return {status:'Gap',what,day:'',local:'',syd:'',where:'',who:'',by:'',ref:'',person:person||undefined}}
 function legTabsHTML(){
   const P=legPerson(); if(!P)return '';
@@ -18625,7 +18709,7 @@ function briefHTML(pi=null){
   ${resv.length?`<h2>Reservations</h2><table><tr><th>Date</th><th>Time</th><th>What</th><th>Name</th><th>People</th><th>For</th><th>Ref</th></tr>${resv.map(r=>`<tr><td>${esc(fdate(r.date))}</td><td>${esc(r.time||'')}</td><td>${esc(r.type||'')}</td><td>${esc(r.name||'')}${(r.status||'Gap')==='Gap'?' <span class="blank">(not booked yet)</span>':''}</td><td>${esc(r.size||'')}</td><td>${esc(r.for||'Everyone')}</td><td>${esc(r.ref||'')}</td></tr>`).join('')}</table>`:''}
   <h2>Door to door, day by day</h2>
   <table><tr>${multi&&!pname?'<th>Person</th>':''}<th>Day</th><th>Local</th><th>Sydney</th><th>What</th><th>Where</th><th>Driver or contact</th><th>Booked or confirmed by</th><th>Ref</th></tr>
-  ${(t.legs||[]).filter(l=>!pname||(l.person?l.person===pname:personMatch(l.who,pname))).sort((a,b)=>multi&&!pname?((a.person||'').localeCompare(b.person||'')):0).map(l=>`<tr>${multi&&!pname?`<td>${esc(l.person||'')}</td>`:''}<td>${esc(/^\d{4}-\d\d-\d\d$/.test(l.day||'')?dayLabel(l.day):l.day)}</td><td>${esc(l.local)}</td><td>${esc(l.syd)}</td><td>${esc(l.what)}</td><td>${esc(l.where)}</td><td>${esc(l.who)}</td><td>${l.status==='Gap'?'<span class="blank">Not yet covered</span>':l.status==='Jaya sorting'?'You (sorting it yourself)':esc(l.by)}</td><td>${esc(l.ref)}</td></tr>`).join('')}</table>
+  ${(t.legs||[]).filter(l=>!pname||(l.person?l.person===pname:personMatch(l.who,pname))).sort((a,b)=>multi&&!pname?((a.person||'').localeCompare(b.person||'')):0).map(l=>`<tr>${multi&&!pname?`<td>${esc(l.person||'')}</td>`:''}<td>${esc(/^\d{4}-\d\d-\d\d$/.test(l.day||'')?dayLabel(l.day):l.day)}</td><td>${esc(l.local)}</td><td>${esc(l.syd)}</td><td>${esc(l.what)}${legExtrasBrief(l)}</td><td>${esc(l.where)}</td><td>${esc(l.who)}</td><td>${l.status==='Gap'?'<span class="blank">Not yet covered</span>':l.status==='Jaya sorting'?'You (sorting it yourself)':esc(l.by)}</td><td>${esc(l.ref)}</td></tr>`).join('')}</table>
   <h2>Who meets you and who to call</h2>
   <table><tr><th>Person</th><th>Role</th><th>When and where</th><th>Phone / WeChat / WhatsApp</th></tr>${contacts.map(c=>`<tr><td>${esc(c.person)}</td><td>${esc(c.role)}</td><td>${esc(c.when)}</td><td>${esc(c.phone)}</td></tr>`).join('')}
   <tr><td>Anj Tino</td><td>EA</td><td>Daily check-in${ckIn}</td><td></td></tr></table>
@@ -18693,9 +18777,10 @@ document.addEventListener('input',e=>{
     cur.budget[+i][k]=el.value; queueSave(); return}
   if(el.dataset.daynote!==undefined){cur.dp=cur.dp||{}; const d=el.dataset.daynote; (cur.dp[d]=cur.dp[d]||{tags:[],note:''}).note=el.value; queueSave(); refreshDerived(); return}
   if(el.dataset.f!==undefined){cur.f[el.dataset.f]=el.value; queueSave(); if(el.dataset.f==='dateOut'||el.dataset.f==='dateBack'){const dp=$('#dayPlan'); if(dp)dp.innerHTML=dayPlanInner(); if(el.dataset.f==='dateOut'&&el.value)calView=el.value.slice(0,7); refreshTimes()} if(el.dataset.rr){renderStep();renderRail()} else refreshDerived(); return}
+  if(el.dataset.lx!==undefined){const [ri,i,k]=el.dataset.lx.split(':'); const x=cur.t.legs[+ri].extra[+i]; x[k]=el.value; queueSave(); return}
   if(el.dataset.t!==undefined){const row=cur.t[el.dataset.t][+el.dataset.r]; row[el.dataset.c]=el.value;
-    if(el.dataset.t==='flights'&&el.dataset.c==='ref'&&el.value.trim()&&(row.status||'Gap')==='Gap'){row.status='Booked'; const ss=el.closest('tr').querySelector('[data-c="status"]'); if(ss)ss.value='Booked'; el.closest('tr').classList.remove('is-gap')}
-    if(el.dataset.c==='status'){el.closest('tr').classList.toggle('is-gap',el.value==='Gap')}
+    if(el.dataset.t==='flights'&&el.dataset.c==='ref'&&el.value.trim()&&(row.status||'Gap')==='Gap'){row.status='Booked'; const ss=el.closest('tr,.legcard').querySelector('[data-c="status"]'); if(ss)ss.value='Booked'; el.closest('tr,.legcard').classList.remove('is-gap')}
+    if(el.dataset.c==='status'){el.closest('tr,.legcard').classList.toggle('is-gap',el.value==='Gap')}
     {const ml=el.parentElement&&el.parentElement.querySelector('.maplink'); if(ml){ml.href=mapUrl(el.value); ml.hidden=!el.value.trim(); if(document.activeElement===el)queuePlaces(el); else placeSkip=false}}
     if(el.dataset.citycell&&document.activeElement===el)showCellCities(el);
     queueSave(); refreshDerived(); return}
@@ -18745,7 +18830,7 @@ document.addEventListener('click',async e=>{
     const k=ns.length; cur.fa={dir:fa.dir||'Out',sel:[]}; queueSave(); renderStep(); refreshDerived(); toast(`Added ${k} flight row${k>1?'s':''}. Add each booking ref and seat.`); return}
   const lp=e.target.closest('[data-legp]'); if(lp&&cur){cur.legP=lp.dataset.legp; cur.legCopy=[]; queueSave(); renderStep(); return}
   if(cur&&e.target.closest('[data-lstart]')){const P=legPerson(); DEFAULT_LEGS.forEach(w=>cur.t.legs.push(blankLeg(w,P))); queueSave(); renderStep(); refreshDerived(); return}
-  const lf=e.target.closest('[data-lfrom]'); if(lf&&cur){const P=legPerson(); legsOf(lf.dataset.lfrom).forEach(l=>cur.t.legs.push({...l,person:P})); queueSave(); renderStep(); refreshDerived(); toast(`Copied ${lf.dataset.lfrom}’s legs`); return}
+  const lf=e.target.closest('[data-lfrom]'); if(lf&&cur){const P=legPerson(); legsOf(lf.dataset.lfrom).forEach(l=>cur.t.legs.push(cloneLeg(l,P))); queueSave(); renderStep(); refreshDerived(); toast(`Copied ${lf.dataset.lfrom}’s legs`); return}
   const lc=e.target.closest('[data-lcsel],[data-lcall],[data-lccity],[data-lcclear]');
   if(lc&&cur){const P=legPerson(); const others=(cur.t.travellers||[]).filter(r=>r.name&&r.name!==P); let sel=new Set(cur.legCopy||[]);
     if(lc.dataset.lcsel){sel.has(lc.dataset.lcsel)?sel.delete(lc.dataset.lcsel):sel.add(lc.dataset.lcsel)}
@@ -18755,7 +18840,7 @@ document.addEventListener('click',async e=>{
     cur.legCopy=[...sel]; queueSave(); renderStep(); return}
   if(cur&&e.target.closest('[data-lcgo]')){const P=legPerson(); const src=legsOf(P); const tg=cur.legCopy||[]; if(!tg.length)return;
     const has=tg.filter(n=>legsOf(n).length); if(has.length&&!confirm(`${has.join(', ')} already ${has.length>1?'have':'has'} legs. Replace them with ${P}’s?`))return;
-    cur.t.legs=cur.t.legs.filter(l=>!tg.includes(l.person)); tg.forEach(n=>src.forEach(l=>cur.t.legs.push({...l,person:n})));
+    cur.t.legs=cur.t.legs.filter(l=>!tg.includes(l.person)); tg.forEach(n=>src.forEach(l=>cur.t.legs.push(cloneLeg(l,n))));
     cur.legCopy=[]; queueSave(); renderStep(); refreshDerived(); toast(`Copied to ${tg.length} ${tg.length>1?'people':'person'}`); return}
   const pb=e.target.closest('[data-pbrief]'); if(pb&&cur){downloadPdf(+pb.dataset.pbrief); return}
   const cm=e.target.closest('[data-calmode]'); if(cm&&cur){calMode=cm.dataset.calmode; refreshTimes(`[data-calmode="${calMode}"]`); return}
@@ -18785,6 +18870,14 @@ document.addEventListener('click',async e=>{
   const add=e.target.closest('[data-add]');
   if(add){const key=add.dataset.add; const blk=STEPS.flatMap(s=>s.blocks).find(b=>b.key===key);
     const row={}; blk.cols.forEach(c=>row[c.k]=c.type==='select'?(typeof c.options==='function'?c.options():c.options)[0]:''); if(blk.perPerson&&legPerson())row.person=legPerson(); cur.t[key].push(row); queueSave(); renderStep(); refreshDerived(); return}
+  const lxa=e.target.closest('[data-lxadd]'); if(lxa&&cur){const l=cur.t.legs[+lxa.dataset.lxadd]; (l.extra=l.extra||[]).push({k:'',v:''}); queueSave(); renderStep(); const ins=document.querySelectorAll(`[data-lx^="${lxa.dataset.lxadd}:${l.extra.length-1}:k"]`); if(ins[0])ins[0].focus(); return}
+  const lxd=e.target.closest('[data-lxdel]'); if(lxd&&cur){const [ri,i]=lxd.dataset.lxdel.split(':'); cur.t.legs[+ri].extra.splice(+i,1); queueSave(); renderStep(); return}
+  const lfd=e.target.closest('[data-lfdel]'); if(lfd&&cur){const [ri,i]=lfd.dataset.lfdel.split(':'); const l=cur.t.legs[+ri]; if(!confirm(`Remove “${l.files[+i].name}” from this leg? The file stays in Google Drive.`))return; l.files.splice(+i,1); queueSave(); renderStep(); return}
+  const lfl=e.target.closest('[data-lflink]'); if(lfl&&cur){const url=(prompt('Paste a link to the file (for example a Google Drive link)')||'').trim(); if(!url)return;
+    if(!/^https?:\/\//i.test(url)){toast('That doesn’t look like a link');return}
+    const name=(prompt('What should this link be called?',/drive\.google|docs\.google/.test(url)?'Google Drive file':url.replace(/^https?:\/\/(www\.)?/,'').split('/')[0])||'').trim()||'Link';
+    const l=cur.t.legs[+lfl.dataset.lflink]; (l.files=l.files||[]).push({name,url}); queueSave(); renderStep(); return}
+  const lfa=e.target.closest('[data-lfattach]'); if(lfa&&cur){attachToLeg(cur.t.legs[+lfa.dataset.lfattach]); return}
   const del=e.target.closest('[data-del]');
   if(del){const [key,ri]=del.dataset.del.split(':'); cur.t[key].splice(+ri,1); queueSave(); renderStep(); refreshDerived(); return}
   if(e.target.id==='copyMsg'){try{await navigator.clipboard.writeText(bookingMessage());toast('Message copied')}catch(_){
