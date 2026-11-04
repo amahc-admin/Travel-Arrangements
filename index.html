@@ -235,8 +235,9 @@ table.ed td.nm{font-weight:600;vertical-align:middle;padding-left:.4rem;color:va
 .legcards{display:flex;flex-direction:column;gap:1rem}
 .legcard{border:1px solid var(--line);border-radius:10px;padding:1rem 1.1rem;background:var(--bg)}
 .legcard.is-gap{border-left:4px solid var(--gap)}
-.lc-top{display:grid;grid-template-columns:minmax(9rem,12rem) minmax(0,1fr) auto;gap:.75rem;align-items:end}
-.lc-del{align-self:center;margin-top:1.2rem}
+.lc-top{display:grid;grid-template-columns:minmax(9rem,12rem) minmax(0,1fr) auto;gap:.75rem;align-items:start}
+.lc-other{margin-top:.4rem}
+.lc-del{align-self:start;margin-top:1.75rem}
 .lc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(12rem,1fr));gap:.85rem .75rem;margin-top:.85rem}
 .lc-wide{grid-column:1/-1}
 .lc-more{margin-top:1rem;padding-top:.85rem;border-top:1px dashed var(--line)}
@@ -18596,7 +18597,8 @@ const LEG_FIELD_IDEAS=['Seat','Class','Terminal','Gate','Baggage','Flight number
 function legCardsHTML(b,rows,LP,optBtn){
   const top=['status','what'], wide=['where'];
   const cards=rows.map((r,ri)=>{ if(LP&&r.person!==LP)return '';
-    const field=c=>`<label class="f lc-f ${wide.includes(c.k)?'lc-wide':''}">${esc(c.label)}${cellInput(b,c,r,ri)}</label>`;
+    const custom=c=>c.k==='what'&&(r.what==='Other'||!LEG_TYPES.includes(r.what))?`<input type="text" class="lc-other" data-legwhat="${ri}" value="${esc(r.what==='Other'?'':r.what)}" placeholder="Type what this leg is, e.g. Visa appointment" aria-label="What this leg is">`:'';
+    const field=c=>`<label class="f lc-f ${wide.includes(c.k)?'lc-wide':''}">${esc(c.label)}${cellInput(b,c,r,ri)}${custom(c)}</label>`;
     const extra=(r.extra||[]).map((x,i)=>`<div class="lx-row"><input type="text" list="lxIdeas" data-lx="${ri}:${i}:k" value="${esc(x.k)}" placeholder="Field, e.g. Seat" aria-label="Field name"><input type="text" data-lx="${ri}:${i}:v" value="${esc(x.v)}" placeholder="Detail" aria-label="${esc(x.k||'Field')} detail"><button class="del" data-lxdel="${ri}:${i}" aria-label="Remove field ${esc(x.k)}">×</button></div>`).join('');
     const files=(r.files||[]).map((f,i)=>`<span class="lf-chip"><a href="${esc(f.url)}" target="_blank" rel="noopener" title="${esc(f.name)}">${esc(f.name)}</a><button class="del" data-lfdel="${ri}:${i}" aria-label="Remove ${esc(f.name)}">×</button></span>`).join('');
     return `<div class="legcard ${(r.status||'Gap')==='Gap'?'is-gap':''}">
@@ -18934,10 +18936,15 @@ document.addEventListener('input',e=>{
     cur.budget[+i][k]=el.value; queueSave(); return}
   if(el.dataset.daynote!==undefined){cur.dp=cur.dp||{}; const d=el.dataset.daynote; (cur.dp[d]=cur.dp[d]||{tags:[],note:''}).note=el.value; queueSave(); refreshDerived(); return}
   if(el.dataset.f!==undefined){cur.f[el.dataset.f]=el.value; queueSave(); if(el.dataset.f==='dateOut'||el.dataset.f==='dateBack'){const dp=$('#dayPlan'); if(dp)dp.innerHTML=dayPlanInner(); if(el.dataset.f==='dateOut'&&el.value)calView=el.value.slice(0,7); refreshTimes()} if(el.dataset.rr){renderStep();renderRail()} else refreshDerived(); return}
+  if(el.dataset.legwhat!==undefined){const row=cur.t.legs[+el.dataset.legwhat]; row.what=el.value.trim()?el.value:'Other';
+    const sel=el.parentElement.querySelector('select'); if(sel){[...sel.options].forEach(o=>{if(!LEG_TYPES.includes(o.value))o.remove()});
+      if(row.what!=='Other')sel.prepend(new Option(row.what,row.what,true,true)); sel.value=row.what}
+    queueSave(); refreshDerived(); return}
   if(el.dataset.lx!==undefined){const [ri,i,k]=el.dataset.lx.split(':'); const x=cur.t.legs[+ri].extra[+i]; x[k]=el.value; queueSave(); return}
   if(el.dataset.t!==undefined){const row=cur.t[el.dataset.t][+el.dataset.r]; row[el.dataset.c]=el.value;
     if(el.dataset.t==='flights'&&el.dataset.c==='ref'&&el.value.trim()&&(row.status||'Gap')==='Gap'){row.status='Booked'; const ss=el.closest('tr,.legcard').querySelector('[data-c="status"]'); if(ss)ss.value='Booked'; el.closest('tr,.legcard').classList.remove('is-gap')}
     if(el.dataset.c==='status'){el.closest('tr,.legcard').classList.toggle('is-gap',el.value==='Gap')}
+    if(el.dataset.t==='legs'&&el.dataset.c==='what'){queueSave(); refreshDerived(); renderStep(); const o=document.querySelector(`[data-legwhat="${el.dataset.r}"]`); if(o)o.focus(); return}
     {const ml=el.parentElement&&el.parentElement.querySelector('.maplink'); if(ml){delete row[el.dataset.c+'Pt']; ml.href=mapUrl(el.value); ml.hidden=!el.value.trim(); if(document.activeElement===el)queuePlaces(el); else placeSkip=false}}
     if(el.dataset.citycell&&document.activeElement===el)showCellCities(el);
     queueSave(); refreshDerived(); return}
