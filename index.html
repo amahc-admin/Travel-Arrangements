@@ -237,6 +237,10 @@ table.ed td.nm{font-weight:600;vertical-align:middle;padding-left:.4rem;color:va
 .legcard.is-gap{border-left:4px solid var(--gap)}
 .lc-top{display:grid;grid-template-columns:minmax(9rem,12rem) minmax(0,1fr) auto;gap:.75rem;align-items:start}
 .lc-other{margin-top:.4rem}
+.lc-copy{margin-top:.85rem;padding:.85rem 1rem;border:1px solid var(--accent);border-radius:8px;background:var(--surface)}
+.lc-keep{display:flex;gap:.5rem;align-items:center;margin-top:.75rem;font-size:.92rem;cursor:pointer}
+.lc-keep input{width:1.1rem;height:1.1rem;accent-color:var(--accent)}
+.lc-copybtn[aria-expanded="true"]{background:var(--soft)}
 .lc-del{align-self:start;margin-top:1.75rem}
 .lc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(12rem,1fr));gap:.85rem .75rem;margin-top:.85rem}
 .lc-wide{grid-column:1/-1}
@@ -18594,6 +18598,35 @@ function cellInput(b,c,r,ri){
 }
 // Legs as roomy cards: the usual fields, plus extra fields and attached files per leg
 const LEG_FIELD_IDEAS=['Seat','Class','Terminal','Gate','Baggage','Flight number','Frequent flyer','Check-in','Pick-up point','Phone','Notes'];
+// Copy one leg to chosen people, each with their own (blank) booking ref
+let legCopyOne=null; // {ri, sel:Set, keepRef}
+function legCopyOneHTML(r){
+  const others=(cur.t.travellers||[]).filter(t=>t.name&&t.name!==r.person);
+  if(!others.length)return `<div class="lc-copy"><p class="status" style="margin:0">Add more travellers in Intake to copy this leg to them.</p></div>`;
+  const cities=[...new Set(others.map(t=>t.from).filter(Boolean))], sel=legCopyOne.sel, n=sel.size;
+  const has=name=>legsOf(name).some(l=>l.what===r.what);
+  return `<div class="lc-copy"><div class="lc-h">Copy “${esc(r.what||'this leg')}” to</div>
+    <div class="pills" style="margin-bottom:.4rem"><button type="button" class="pill" data-lc1all="1">Everyone else</button>${cities.map(c=>`<button type="button" class="pill" data-lc1city="${esc(c)}">Everyone from ${esc(c)}</button>`).join('')}<button type="button" class="pill" data-lc1clear="1">Clear</button></div>
+    <div class="pills">${others.map(t=>`<button type="button" class="pill" data-lc1sel="${esc(t.name)}" aria-pressed="${sel.has(t.name)}">${esc(t.name)}${has(t.name)?` (has ${esc(r.what)})`:''}</button>`).join('')}</div>
+    <label class="lc-keep"><input type="checkbox" data-lc1keep="1" ${legCopyOne.keepRef?'checked':''}> Same booking ref for everyone (one group booking)</label>
+    <p class="status" style="margin:.25rem 0 .6rem">${legCopyOne.keepRef?'Everything is copied, including the booking ref.':'Each person gets their own copy with the booking ref left blank, ready for their own.'} If someone already has a “${esc(r.what)}” leg, it’s updated and keeps their own ref and files.</p>
+    <div class="row"><button type="button" class="btn primary" data-lc1go="1" ${n?'':'disabled'}>Copy to ${n} ${n===1?'person':'people'}</button><button type="button" class="btn quiet" data-lc1cancel="1">Cancel</button></div></div>`;
+}
+function copyLegTo(src,names,keepRef){
+  const legs=cur.t.legs, srcLegs=legsOf(src.person), pos=srcLegs.indexOf(src);
+  for(const n of names){
+    const c=cloneLeg(src,n); if(!keepRef)c.ref='';
+    const existing=legs.find(l=>l.person===n&&l.what===src.what);
+    if(existing){const own={ref:existing.ref,files:existing.files,extra:existing.extra};
+      Object.assign(existing,c); if(!keepRef&&own.ref)existing.ref=own.ref; if(own.files)existing.files=own.files;
+      if(own.extra){const keys=new Set(own.extra.map(x=>x.k)); existing.extra=[...own.extra,...(c.extra||[]).filter(x=>!keys.has(x.k))]}
+      continue}
+    // put it after the leg that comes before it in the source person's journey, if they have it
+    let at=-1; for(let i=pos-1;i>=0&&at<0;i--){const prev=srcLegs[i]; at=legs.findIndex(l=>l.person===n&&l.what===prev.what)}
+    if(at<0){const theirs=legs.map((l,i)=>l.person===n?i:-1).filter(i=>i>=0); at=pos===0&&theirs.length?theirs[0]-1:(theirs.length?theirs[theirs.length-1]:legs.length-1)}
+    legs.splice(at+1,0,c);
+  }
+}
 function legCardsHTML(b,rows,LP,optBtn){
   const top=['status','what'], wide=['where'];
   const cards=rows.map((r,ri)=>{ if(LP&&r.person!==LP)return '';
@@ -18606,7 +18639,8 @@ function legCardsHTML(b,rows,LP,optBtn){
       <div class="lc-grid">${b.cols.filter(c=>!top.includes(c.k)).map(field).join('')}</div>
       <div class="lc-more"><div class="lc-h">Extra details</div>${extra}
         ${files?`<div class="lf-list">${files}</div>`:''}
-        <div class="row lc-acts"><button type="button" class="btn quiet" data-lxadd="${ri}">+ Add field</button><button type="button" class="btn quiet" data-lfattach="${ri}">Attach file</button><button type="button" class="btn quiet" data-lflink="${ri}">Add link</button></div></div>
+        <div class="row lc-acts"><button type="button" class="btn quiet" data-lxadd="${ri}">+ Add field</button><button type="button" class="btn quiet" data-lfattach="${ri}">Attach file</button><button type="button" class="btn quiet" data-lflink="${ri}">Add link</button><button type="button" class="btn quiet lc-copybtn" data-lc1="${ri}" aria-expanded="${legCopyOne&&legCopyOne.ri===ri}">Copy to others</button></div></div>
+      ${legCopyOne&&legCopyOne.ri===ri?legCopyOneHTML(r):''}
     </div>`}).join('');
   return `<datalist id="lxIdeas">${LEG_FIELD_IDEAS.map(x=>`<option value="${esc(x)}">`).join('')}</datalist><div class="legcards">${cards}</div><div class="row"><button class="btn add" data-add="legs">Add leg</button>${optBtn}</div>`;
 }
@@ -18770,7 +18804,7 @@ function legCopyHTML(){
     const withLegs=others.filter(r=>legsOf(r.name).length);
     return '';
   }
-  return `<div style="margin-top:1.1rem;padding-top:1rem;border-top:1px solid var(--line)"><h2>Copy ${esc(P)}’s legs to others</h2>
+  return `<div style="margin-top:1.1rem;padding-top:1rem;border-top:1px solid var(--line)"><h2>Copy all of ${esc(P)}’s legs to others</h2>
   <p class="status" style="margin-top:0">Copies every leg as it is now, then you adjust what’s different. Anyone already with legs is replaced.</p>
   <div class="pills" style="margin-bottom:.4rem"><button type="button" class="pill" data-lcall="1">Everyone else</button>${cities.map(c=>`<button type="button" class="pill" data-lccity="${esc(c)}">Everyone from ${esc(c)}</button>`).join('')}<button type="button" class="pill" data-lcclear="1">Clear</button></div>
   <div class="pills">${others.map(r=>`<button type="button" class="pill" data-lcsel="${esc(r.name)}" aria-pressed="${sel.has(r.name)}">${esc(r.name)}${legsOf(r.name).length?' (has legs)':''}</button>`).join('')}</div>
@@ -18925,7 +18959,7 @@ document.addEventListener('input',e=>{
   if(el.id==='cityInput'){
     if(/[,;]/.test(el.value)){const parts=el.value.split(/[,;]/); const rest=parts.pop(); addCities(parts.filter(p=>p.trim()),rest.trimStart()); return}
     showCityList(el.value); return}
-  if(el.dataset.legsel!==undefined){cur.legP=el.value; cur.legCopy=[]; queueSave(); renderStep(); return}
+  if(el.dataset.legsel!==undefined){cur.legP=el.value; cur.legCopy=[]; legCopyOne=null; queueSave(); renderStep(); return}
   if(el.dataset.fa!==undefined){cur.fa=cur.fa||{dir:'Out',sel:[]}; cur.fa[el.dataset.fa]=el.value; queueSave(); if(el.dataset.citycell&&document.activeElement===el)showCellCities(el); return}
   if(el.dataset.tg!==undefined){const [ri,k]=el.dataset.tg.split('|'); const row=(cur.t.travellers||[])[+ri]; if(!row)return;
     row[k]=el.type==='checkbox'?el.checked:el.value; if(el.tagName==='SELECT')el.classList.toggle('st-gap',el.value==='Gap');
@@ -19040,6 +19074,15 @@ document.addEventListener('click',async e=>{
   const lv=e.target.closest('[data-legview]'); if(lv&&cur){cur.legView=lv.dataset.legview; queueSave(); renderStep(); return}
   const lfi=e.target.closest('[data-legfilter]'); if(lfi&&cur){cur.legFilter=lfi.dataset.legfilter; queueSave(); renderStep(); return}
   const le=e.target.closest('[data-legedit]'); if(le&&cur){cur.legView='detail'; cur.legP=le.dataset.legedit; queueSave(); renderStep(); return}
+  const c1=e.target.closest('[data-lc1]'); if(c1&&cur){const ri=+c1.dataset.lc1; legCopyOne=legCopyOne&&legCopyOne.ri===ri?null:{ri,sel:new Set(),keepRef:false}; renderStep(); const p=document.querySelector('.lc-copy'); if(p)p.scrollIntoView({block:'nearest',behavior:'smooth'}); return}
+  if(legCopyOne&&cur){const src=cur.t.legs[legCopyOne.ri], others=(cur.t.travellers||[]).filter(t=>t.name&&t.name!==(src&&src.person)), sel=legCopyOne.sel;
+    const pk=e.target.closest('[data-lc1sel],[data-lc1all],[data-lc1city],[data-lc1clear]');
+    if(pk){if(pk.dataset.lc1sel){const n=pk.dataset.lc1sel; sel.has(n)?sel.delete(n):sel.add(n)} else if(pk.dataset.lc1all)others.forEach(t=>sel.add(t.name));
+      else if(pk.dataset.lc1city)others.filter(t=>t.from===pk.dataset.lc1city).forEach(t=>sel.add(t.name)); else sel.clear(); renderStep(); return}
+    if(e.target.closest('[data-lc1keep]')){legCopyOne.keepRef=e.target.checked; renderStep(); return}
+    if(e.target.closest('[data-lc1cancel]')){legCopyOne=null; renderStep(); return}
+    if(e.target.closest('[data-lc1go]')&&src&&sel.size){const names=[...sel], keep=legCopyOne.keepRef; copyLegTo(src,names,keep); legCopyOne=null; queueSave(); renderStep(); refreshDerived();
+      toast(`Copied ${src.what} to ${names.length} ${names.length===1?'person':'people'}${keep?'':'. Add each person’s booking ref'}`); return}}
   const lxa=e.target.closest('[data-lxadd]'); if(lxa&&cur){const l=cur.t.legs[+lxa.dataset.lxadd]; (l.extra=l.extra||[]).push({k:'',v:''}); queueSave(); renderStep(); const ins=document.querySelectorAll(`[data-lx^="${lxa.dataset.lxadd}:${l.extra.length-1}:k"]`); if(ins[0])ins[0].focus(); return}
   const lxd=e.target.closest('[data-lxdel]'); if(lxd&&cur){const [ri,i]=lxd.dataset.lxdel.split(':'); cur.t.legs[+ri].extra.splice(+i,1); queueSave(); renderStep(); return}
   const lfd=e.target.closest('[data-lfdel]'); if(lfd&&cur){const [ri,i]=lfd.dataset.lfdel.split(':'); const l=cur.t.legs[+ri]; if(!confirm(`Remove “${l.files[+i].name}” from this leg? The file stays in Google Drive.`))return; l.files.splice(+i,1); queueSave(); renderStep(); return}
@@ -19049,7 +19092,7 @@ document.addEventListener('click',async e=>{
     const l=cur.t.legs[+lfl.dataset.lflink]; (l.files=l.files||[]).push({name,url}); queueSave(); renderStep(); return}
   const lfa=e.target.closest('[data-lfattach]'); if(lfa&&cur){attachToLeg(cur.t.legs[+lfa.dataset.lfattach]); return}
   const del=e.target.closest('[data-del]');
-  if(del){const [key,ri]=del.dataset.del.split(':'); cur.t[key].splice(+ri,1); queueSave(); renderStep(); refreshDerived(); return}
+  if(del){legCopyOne=null; const [key,ri]=del.dataset.del.split(':'); cur.t[key].splice(+ri,1); queueSave(); renderStep(); refreshDerived(); return}
   if(e.target.id==='copyMsg'){try{await navigator.clipboard.writeText(bookingMessage());toast('Message copied')}catch(_){
       const r=document.createRange(); r.selectNodeContents($('#bcMsg')); const s=getSelection(); s.removeAllRanges(); s.addRange(r); toast('Selected. Press Ctrl+C or Cmd+C to copy')} return}
   if(e.target.id==='dlPdf'){downloadPdf();return}
