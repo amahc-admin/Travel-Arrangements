@@ -377,17 +377,6 @@ const STEPS = [
      'Passport valid 6+ months past return for every traveller',
      'Travel insurance in place']}
  ]},
- {id:'legs', title:'Door to door', when:'Before the booking check',
-  lead:'Every leg from leaving home to getting home, for each traveller. Each one is booked, confirmed by a named person, or marked as being sorted by the traveller.',
-  blocks:[
-   {type:'gaps'},
-   {type:'table', title:'Legs', key:'legs', perPerson:true, cols:[
-     {k:'status',label:'Status',type:'select',options:['Gap','Booked','Confirmed','Jaya sorting'],w:8},
-     {k:'what',label:'What',type:'select',options:LEG_TYPES,w:17},
-     {k:'day',label:'Day',type:'date',w:8.5},{k:'local',label:'Local time',type:'time',w:6.5},{k:'syd',label:'Sydney time',type:'time',w:6.5},
-     {k:'where',label:'Where',maps:true,w:13},{k:'who',label:'Driver or contact',w:9},{k:'by',label:'Booked or confirmed by',w:9},{k:'ref',label:'Booking ref',w:7}]},
-   {type:'checks', title:'Done', items:['Every leg booked, confirmed by a named person, or marked as Jaya sorting it','Any gap raised with Jaya before he leaves']}
- ]},
  {id:'check', title:'Booking check', when:'Wait for “yes”',
   lead:'Fill in the options and copy the message to Jaya. Nothing is paid until he replies “yes”. Silence is not a yes.',
   blocks:[
@@ -407,6 +396,17 @@ const STEPS = [
      'Flagged: dates and times, cabin or class, anything non-refundable, anything not in the profile, anything over A$500',
      'Sent in Slack DM (WhatsApp if he’s travelling)','No reply and a fare about to expire: messaged again, then called',
      'Jaya’s written “yes” received and saved with the booking']}
+ ]},
+ {id:'legs', title:'Door to door', when:'After the “yes”',
+  lead:'Every leg from leaving home to getting home, for each traveller. Each one is booked, confirmed by a named person, or marked as being sorted by the traveller.',
+  blocks:[
+   {type:'gaps'},
+   {type:'table', title:'Legs', key:'legs', perPerson:true, cols:[
+     {k:'status',label:'Status',type:'select',options:['Gap','Booked','Confirmed','Jaya sorting'],w:8},
+     {k:'what',label:'What',type:'select',options:LEG_TYPES,w:17},
+     {k:'day',label:'Day',type:'date',w:8.5},{k:'local',label:'Local time',type:'time',w:6.5},{k:'syd',label:'Sydney time',type:'time',w:6.5},
+     {k:'where',label:'Where',maps:true,w:13},{k:'who',label:'Driver or contact',w:9},{k:'by',label:'Booked or confirmed by',w:9},{k:'ref',label:'Booking ref',w:7}]},
+   {type:'checks', title:'Done', items:['Every leg booked, confirmed by a named person, or marked as Jaya sorting it','Any gap raised with Jaya before he leaves']}
  ]},
  {id:'book', title:'Book and record', when:'After the “yes”',
   lead:'Book exactly what was approved. These details feed the trip brief.',
@@ -18356,7 +18356,7 @@ function afterDestChange(rest=''){
 function newTrip(){
   const id='t'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
   const leg=(what,where='')=>({day:'',local:'',syd:'',what,where,who:'',by:'',ref:'',status:'Gap'});
-  return {id,created:Date.now(),updated:Date.now(),step:0,sv:2,
+  return {id,created:Date.now(),updated:Date.now(),step:0,sv:STEP_VERSION,
     f:{kind:'Work',team:'No',china:'No'},c:{},
     t:{
       travellers:[{name:'Jaya Yoannidis',mobile:'',chat:'',email:'',flights:''}],
@@ -18538,9 +18538,11 @@ function flightsBriefHTML(pname){
   return `<h2>${pname?'Your flights':'Flights'}</h2><table><tr>${pname?'':'<th>Traveller</th>'}<th>Date</th><th>Flight</th><th>Route</th><th>Departs</th><th>Arrives</th><th>Booking ref</th><th>Seat</th></tr>${rows.map(r=>`<tr>${pname?'':`<td>${esc(r.who||'')}</td>`}<td>${esc(r.date?dayLabel(r.date):'')}</td><td>${esc(flLabel(r))}</td><td>${esc(r.from||'')} → ${esc(r.to||'')}</td><td>${esc(r.dep||'')}</td><td>${esc(r.arr||'')}</td><td>${r.ref?esc(r.ref):'<span class="blank">[ref]</span>'}</td><td>${esc(r.seat||'')}</td></tr>`).join('')}</table>`;
 }
 function isTeam(t=cur){return t&&t.f.team==='Yes'}
-// Steps used to be in this order; saved trips remember a position, so map it to the same step in the new order
-const OLD_STEP_ORDER=['intake','research','legs','team','check','book','res','people','emergency','brief','during','debrief'];
-function migrateStep(t){if(!t||t.sv===2)return t; const id=OLD_STEP_ORDER[t.step], ni=STEPS.findIndex(s=>s.id===id); if(ni>=0)t.step=ni; t.sv=2; return t}
+// Saved trips remember a step by position; map it from the order it was saved in (sv) to the same step now
+const STEP_ORDERS={1:['intake','research','legs','team','check','book','res','people','emergency','brief','during','debrief'],
+  2:['intake','research','legs','check','book','res','people','emergency','brief','team','during','debrief']};
+const STEP_VERSION=3;
+function migrateStep(t){if(!t||t.sv===STEP_VERSION)return t; const old=STEP_ORDERS[t.sv||1], id=old&&old[t.step], ni=STEPS.findIndex(s=>s.id===id); if(ni>=0)t.step=ni; t.sv=STEP_VERSION; return t}
 function visSteps(t=cur){return STEPS.map((_,i)=>i).filter(i=>shows(STEPS[i],t))}
 function fixStep(){const v=visSteps(); if(!v.includes(cur.step)){cur.step=v.filter(i=>i<cur.step).pop()??v[0]}}
 function personMatch(text,name){
