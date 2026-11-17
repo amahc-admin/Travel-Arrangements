@@ -249,6 +249,9 @@ table.ed td.nm{font-weight:600;vertical-align:middle;padding-left:.4rem;color:va
 .legcard.dragging .lc-grip b{color:var(--accent-ink)}
 body.noselect{user-select:none;-webkit-user-select:none;cursor:grabbing}
 .lc-other{margin-top:.4rem}
+.pastezone{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .5rem;padding:.85rem 1rem;border:2px dashed var(--line);border-radius:8px;color:var(--muted);font-size:.92rem;background:var(--bg);cursor:text}
+.pastezone:focus,.pastezone.over{border-color:var(--accent);color:var(--ink);outline:none}
+.pastezone .btn{color:var(--accent);padding:.25rem .5rem}
 .lc-copy{margin-top:.85rem;padding:.85rem 1rem;border:1px solid var(--accent);border-radius:8px;background:var(--surface)}
 .lc-keep{display:flex;gap:.5rem;align-items:center;margin-top:.75rem;font-size:.92rem;cursor:pointer}
 .lc-keep input{width:1.1rem;height:1.1rem;accent-color:var(--accent)}
@@ -18475,13 +18478,43 @@ function pickPlace(i){const el=placeTarget, m=placeMatches[i]; if(!el||!m)return
 const GOOGLE_CLIENT_ID='95709746435-c54mg0h49isdfn39p2qnd6re2t6hnn4h.apps.googleusercontent.com';
 let gToken=null, gTokenExp=0, gTokenClient=null;
 if(GOOGLE_CLIENT_ID){const sc=document.createElement('script'); sc.src='https://accounts.google.com/gsi/client'; sc.async=true; document.head.appendChild(sc)}
-function driveSignIn(){
+let afterSignIn=null;
+function driveSignIn(then){
   if(!(window.google&&google.accounts&&google.accounts.oauth2)){toast('Google sign-in is still loading. Try again in a moment');return}
+  afterSignIn=then||null;
   gTokenClient=gTokenClient||google.accounts.oauth2.initTokenClient({client_id:GOOGLE_CLIENT_ID,scope:'https://www.googleapis.com/auth/drive.file',callback:r=>{
-    if(r.error){toast('Google sign-in didn’t finish');return}
-    gToken=r.access_token; gTokenExp=Date.now()+(r.expires_in-60)*1000; toast('Connected to Google Drive. Tap Attach file again')}});
+    if(r.error){afterSignIn=null; toast('Google sign-in didn’t finish');return}
+    gToken=r.access_token; gTokenExp=Date.now()+(r.expires_in-60)*1000;
+    const next=afterSignIn; afterSignIn=null; if(next)next(); else toast('Connected to Google Drive. Tap Attach file again')}});
   gTokenClient.requestAccessToken();
 }
+const driveReady=()=>gToken&&Date.now()<gTokenExp;
+// Jaya's written "yes": paste, drop or choose screenshots; they go to the trip's Drive folder
+function yesZoneHTML(){
+  const files=cur.f.yesFiles||[];
+  return `<div class="pastezone" tabindex="0" data-yeszone="1" aria-label="Paste a screenshot of Jaya’s yes"><span>📋 Paste a screenshot here (Ctrl+V or Cmd+V), drag one in, or</span> <button type="button" class="btn quiet" data-yespick="1">choose an image</button></div>
+    ${files.length?`<div class="lf-list">${files.map((f,i)=>`<span class="lf-chip"><a href="${esc(f.url)}" target="_blank" rel="noopener" title="${esc(f.name)}">${esc(f.name)}</a><button class="del" data-yesdel="${i}" aria-label="Remove ${esc(f.name)}">×</button></span>`).join('')}</div>`:''}`;
+}
+async function uploadYes(files){
+  files=[...files].filter(f=>f&&f.size); if(!files.length||!cur)return;
+  if(!GOOGLE_CLIENT_ID){toast('Google Drive isn’t connected, so screenshots can’t be saved');return}
+  if(!driveReady()){toast('Sign in to Google to save the screenshot'); driveSignIn(()=>uploadYes(files)); return}
+  const trip=cur, stamp=new Date().toLocaleString('en-AU',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}).replace(/[/:]/g,'.');
+  for(const [i,file] of files.entries()){
+    const ext=(file.name.match(/\.\w+$/)||['.'+((file.type.split('/')[1])||'png')])[0], name=`Jaya’s yes - ${stamp}${files.length>1?' ('+(i+1)+')':''}${ext}`;
+    toast('Uploading screenshot…');
+    try{const f=await driveSave(file,name,trip); (trip.f.yesFiles=trip.f.yesFiles||[]).push({name,url:f.webViewLink,id:f.id}); if(!trip.f.yesLink)trip.f.yesLink=f.webViewLink;
+      if(cur===trip){queueSave(); renderStep()} else persist(trip); toast('Screenshot saved to Google Drive')}
+    catch(err){toast('Couldn’t save the screenshot: '+err.message)}}
+}
+document.addEventListener('paste',e=>{
+  if(!cur||!e.target.closest||!e.target.closest('[data-yeszone],[data-f="yesLink"]'))return;
+  const imgs=[...(e.clipboardData&&e.clipboardData.files||[])].filter(f=>/^image\//.test(f.type)); if(!imgs.length)return;
+  e.preventDefault(); uploadYes(imgs);
+});
+document.addEventListener('dragover',e=>{const z=e.target.closest&&e.target.closest('[data-yeszone]'); if(z){e.preventDefault(); z.classList.add('over')}});
+document.addEventListener('dragleave',e=>{const z=e.target.closest&&e.target.closest('[data-yeszone]'); if(z)z.classList.remove('over')});
+document.addEventListener('drop',e=>{const z=e.target.closest&&e.target.closest('[data-yeszone]'); if(!z)return; e.preventDefault(); z.classList.remove('over'); uploadYes([...e.dataTransfer.files].filter(f=>/^image\/|pdf$/.test(f.type)))});
 function attachToLeg(leg){
   if(!GOOGLE_CLIENT_ID){alert('Google Drive isn’t connected to this site yet, so files can’t be uploaded from here.\n\nFor now, upload the file to Google Drive yourself, copy its link, and use “Add link”.');return}
   if(!gToken||Date.now()>gTokenExp){driveSignIn();return}
@@ -18503,9 +18536,10 @@ async function driveFolder(name,parent){
   const made=await driveApi('https://www.googleapis.com/drive/v3/files?fields=id',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,mimeType:'application/vnd.google-apps.folder',parents:parent?[parent]:undefined})});
   return made.id;
 }
-async function driveUpload(file,leg){
-  const root=await driveFolder('Trip runbook'), folder=await driveFolder(tripName(cur)||'Untitled trip',root);
-  const meta={name:[leg.person,leg.what,file.name].filter(Boolean).join(' - '),parents:[folder]};
+async function driveUpload(file,leg){return driveSave(file,[leg.person,leg.what,file.name].filter(Boolean).join(' - '),cur)}
+async function driveSave(file,name,trip){
+  const root=await driveFolder('Trip runbook'), folder=await driveFolder(tripName(trip)||'Untitled trip',root);
+  const meta={name,parents:[folder]};
   const body=new FormData(); body.append('metadata',new Blob([JSON.stringify(meta)],{type:'application/json'})); body.append('file',file);
   return driveApi('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink',{method:'POST',body});
 }
@@ -18606,7 +18640,7 @@ function fieldHTML(f){
   if(f.type==='textarea')input=`<textarea ${attrs}>${esc(v)}</textarea>`;
   else if(f.type==='select')input=`<select ${attrs}>${f.options.map(o=>`<option ${o===v?'selected':''}>${esc(o)}</option>`).join('')}</select>`;
   else input=`<input type="${f.type||'text'}" ${attrs} value="${esc(v)}">`;
-  return `<label class="f ${f.wide?'wide':''}">${esc(f.label)}${input}</label>`;
+  return `<label class="f ${f.wide?'wide':''}">${esc(f.label)}${input}</label>`+(f.k==='yesLink'?`<div class="f wide">${yesZoneHTML()}</div>`:'');
 }
 function cellInput(b,c,r,ri){
   const v=r[c.k]??''; const a=`data-t="${b.key}" data-r="${ri}" data-c="${c.k}" aria-label="${esc(c.label)} row ${ri+1}"`;
@@ -19130,6 +19164,9 @@ document.addEventListener('click',async e=>{
   const lv=e.target.closest('[data-legview]'); if(lv&&cur){cur.legView=lv.dataset.legview; queueSave(); renderStep(); return}
   const lfi=e.target.closest('[data-legfilter]'); if(lfi&&cur){cur.legFilter=lfi.dataset.legfilter; queueSave(); renderStep(); return}
   const le=e.target.closest('[data-legedit]'); if(le&&cur){cur.legView='detail'; cur.legP=le.dataset.legedit; queueSave(); renderStep(); return}
+  if(e.target.closest('[data-yespick]')&&cur){const fi=document.createElement('input'); fi.type='file'; fi.accept='image/*,application/pdf'; fi.multiple=true; fi.onchange=()=>uploadYes(fi.files);
+    if(GOOGLE_CLIENT_ID&&!driveReady()){driveSignIn(()=>toast('Connected to Google Drive. Tap “choose an image” again')); return} fi.click(); return}
+  const yd=e.target.closest('[data-yesdel]'); if(yd&&cur){const i=+yd.dataset.yesdel, f=cur.f.yesFiles[i]; if(!confirm(`Remove “${f.name}”? The file stays in Google Drive.`))return; cur.f.yesFiles.splice(i,1); if(cur.f.yesLink===f.url)cur.f.yesLink=(cur.f.yesFiles[0]||{}).url||''; queueSave(); renderStep(); return}
   const c1=e.target.closest('[data-lc1]'); if(c1&&cur){const ri=+c1.dataset.lc1; legCopyOne=legCopyOne&&legCopyOne.ri===ri?null:{ri,sel:new Set(),keepRef:false}; renderStep(); const p=document.querySelector('.lc-copy'); if(p)p.scrollIntoView({block:'nearest',behavior:'smooth'}); return}
   if(legCopyOne&&cur){const src=cur.t.legs[legCopyOne.ri], others=(cur.t.travellers||[]).filter(t=>t.name&&t.name!==(src&&src.person)), sel=legCopyOne.sel;
     const pk=e.target.closest('[data-lc1sel],[data-lc1all],[data-lc1city],[data-lc1clear]');
