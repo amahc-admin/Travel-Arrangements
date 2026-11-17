@@ -172,6 +172,7 @@ pre.msg{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);b
 .briefdoc th{background:#EDF1EE;font-weight:600}
 .briefdoc ul{margin:4px 0;padding-left:16px}
 .briefdoc .blank{color:#B4441A}
+.briefdoc a{color:#0E6E62;text-decoration:underline}
 .briefdoc p{margin:3px 0}
 
 .empty{max-width:34rem;padding:3rem 0}
@@ -387,17 +388,6 @@ const STEPS = [
      {k:'where',label:'Where',maps:true,w:13},{k:'who',label:'Driver or contact',w:9},{k:'by',label:'Booked or confirmed by',w:9},{k:'ref',label:'Booking ref',w:7}]},
    {type:'checks', title:'Done', items:['Every leg booked, confirmed by a named person, or marked as Jaya sorting it','Any gap raised with Jaya before he leaves']}
  ]},
- {id:'team', title:'Team', when:'Everyone covered', showIf:'team',
-  lead:'One row per person. Every booking is covered, or marked as their own way, and everyone has their own details.',
-  blocks:[
-   {type:'teamgaps'},
-   {type:'teamgrid', title:'Each person'},
-   {type:'checks', title:'Done', items:[
-     'Jaya’s “yes” covers every traveller’s booking','Names on tickets exactly as on each passport',
-     'People on the same flight seated together where possible','Each person sent their own tickets, hotel details and personal brief',
-     'Dietary needs sent to restaurants and the venue','Everyone in the trip group chat, with each other’s numbers',
-     'Team told the plan and who to call on the day']}
- ]},
  {id:'check', title:'Booking check', when:'Wait for “yes”',
   lead:'Fill in the options and copy the message to Jaya. Nothing is paid until he replies “yes”. Silence is not a yes.',
   blocks:[
@@ -508,6 +498,17 @@ const STEPS = [
    {type:'table', title:'Open decisions', key:'decisions', cols:[{k:'decision',label:'Decision'},{k:'options',label:'Options'},{k:'rec',label:'Recommendation'},{k:'by',label:'Needed by'}]},
    {type:'brief'},
    {type:'checks', title:'Done', items:['Sent as a PDF to Jaya and anyone with him','Saved in the trip folder','Jaya replied “got it” or changes made','Printed copy in his bag','Hotel paid and confirmed']}
+ ]},
+ {id:'team', title:'Team', when:'Everyone covered', showIf:'team',
+  lead:'One row per person. Every booking is covered, or marked as their own way, and everyone has their own details.',
+  blocks:[
+   {type:'teamgaps'},
+   {type:'teamgrid', title:'Each person'},
+   {type:'checks', title:'Done', items:[
+     'Jaya’s “yes” covers every traveller’s booking','Names on tickets exactly as on each passport',
+     'People on the same flight seated together where possible','Each person sent their own tickets, hotel details and personal brief',
+     'Dietary needs sent to restaurants and the venue','Everyone in the trip group chat, with each other’s numbers',
+     'Team told the plan and who to call on the day']}
  ]},
  {id:'during', title:'During the trip', when:'Every day away',
   lead:'Keep every pick-up and meeting moving, even when Jaya has poor internet.',
@@ -18355,7 +18356,7 @@ function afterDestChange(rest=''){
 function newTrip(){
   const id='t'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
   const leg=(what,where='')=>({day:'',local:'',syd:'',what,where,who:'',by:'',ref:'',status:'Gap'});
-  return {id,created:Date.now(),updated:Date.now(),step:0,
+  return {id,created:Date.now(),updated:Date.now(),step:0,sv:2,
     f:{kind:'Work',team:'No',china:'No'},c:{},
     t:{
       travellers:[{name:'Jaya Yoannidis',mobile:'',chat:'',email:'',flights:''}],
@@ -18379,7 +18380,7 @@ function titleCase(s){return String(s??'').replace(/[A-Za-z][\w’'-]*/g,(w,i,st
 function setSave(t){$('#saveState').textContent=t}
 function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show');clearTimeout(toast._t);toast._t=setTimeout(()=>el.classList.remove('show'),2600)}
 
-function lsLoad(){try{return JSON.parse(localStorage.getItem(LS)||'[]')}catch(e){return []}}
+function lsLoad(){try{return JSON.parse(localStorage.getItem(LS)||'[]').map(migrateStep)}catch(e){return []}}
 function lsSave(){try{localStorage.setItem(LS,JSON.stringify(trips)); if(cur)localStorage.setItem(LS+'.open',cur.id); return true}
   catch(e){setSave('Not saved: this browser is blocking storage'); toast('Couldn’t save on this device. Use Back Up to keep a copy'); return false}}
 
@@ -18537,6 +18538,9 @@ function flightsBriefHTML(pname){
   return `<h2>${pname?'Your flights':'Flights'}</h2><table><tr>${pname?'':'<th>Traveller</th>'}<th>Date</th><th>Flight</th><th>Route</th><th>Departs</th><th>Arrives</th><th>Booking ref</th><th>Seat</th></tr>${rows.map(r=>`<tr>${pname?'':`<td>${esc(r.who||'')}</td>`}<td>${esc(r.date?dayLabel(r.date):'')}</td><td>${esc(flLabel(r))}</td><td>${esc(r.from||'')} → ${esc(r.to||'')}</td><td>${esc(r.dep||'')}</td><td>${esc(r.arr||'')}</td><td>${r.ref?esc(r.ref):'<span class="blank">[ref]</span>'}</td><td>${esc(r.seat||'')}</td></tr>`).join('')}</table>`;
 }
 function isTeam(t=cur){return t&&t.f.team==='Yes'}
+// Steps used to be in this order; saved trips remember a position, so map it to the same step in the new order
+const OLD_STEP_ORDER=['intake','research','legs','team','check','book','res','people','emergency','brief','during','debrief'];
+function migrateStep(t){if(!t||t.sv===2)return t; const id=OLD_STEP_ORDER[t.step], ni=STEPS.findIndex(s=>s.id===id); if(ni>=0)t.step=ni; t.sv=2; return t}
 function visSteps(t=cur){return STEPS.map((_,i)=>i).filter(i=>shows(STEPS[i],t))}
 function fixStep(){const v=visSteps(); if(!v.includes(cur.step)){cur.step=v.filter(i=>i<cur.step).pop()??v[0]}}
 function personMatch(text,name){
@@ -18723,8 +18727,15 @@ function legPerson(){
   if(!ns.includes(cur.legP))cur.legP=ns[0]; return cur.legP;
 }
 function legsOf(name){return (cur.t.legs||[]).filter(l=>l.person===name)}
-function legExtrasBrief(l){const x=(l.extra||[]).filter(e=>e.k||e.v).map(e=>`${esc(e.k)}${e.k&&e.v?': ':''}${esc(e.v)}`), f=(l.files||[]).map(f=>`<a href="${esc(f.url)}">${esc(f.name)}</a>`);
-  return x.length||f.length?`<div style="color:#5A6A6D;font-size:10.5px;margin-top:2px">${[...x,...(f.length?['Files: '+f.join(', ')]:[])].join('<br>')}</div>`:''}
+function legExtrasBrief(l){const x=(l.extra||[]).filter(e=>e.k||e.v).map(e=>`${esc(e.k)}${e.k&&e.v?': ':''}${esc(e.v)}`), n=(l.files||[]).length;
+  return x.length||n?`<div style="color:#5A6A6D;font-size:10.5px;margin-top:2px">${[...x,...(n?[`📎 ${n} attached, see Attached tickets and documents`]:[])].join('<br>')}</div>`:''}
+// Every file attached on Door to Door, linked, for the brief (one person's, or everyone's)
+function docsBrief(t,pname,multi){
+  const legs=(t.legs||[]).filter(l=>(l.files||[]).length&&(!pname||l.person===pname)).sort((a,b)=>multi&&!pname?(a.person||'').localeCompare(b.person||''):0);
+  if(!legs.length)return '';
+  const rows=legs.flatMap(l=>l.files.map(f=>`<tr>${multi&&!pname?`<td>${esc(l.person||'')}</td>`:''}<td>${esc(l.what)}</td><td><a href="${esc(f.url)}">${esc(f.name)}</a></td></tr>`));
+  return `<h2>Attached tickets and documents</h2><p>Everything attached in Door to Door. Click a name to open it.</p><table><tr>${multi&&!pname?'<th>Person</th>':''}<th>For</th><th>Document</th></tr>${rows.join('')}</table>`;
+}
 function cloneLeg(l,person){const c={...l,person}; delete c.files; if(l.extra)c.extra=l.extra.map(x=>({...x})); return c}
 function blankLeg(what,person){return {status:'Gap',what,day:'',local:'',syd:'',where:'',who:'',by:'',ref:'',person:person||undefined}}
 // Overview: a read-only itinerary of every traveller's legs, showing what's booked and what isn't
@@ -18941,6 +18952,7 @@ function briefBody(pi=null){
   <h2>Door to door, day by day</h2>
   <table><tr>${multi&&!pname?'<th>Person</th>':''}<th>Day</th><th>Local</th><th>Sydney</th><th>What</th><th>Where</th><th>Driver or contact</th><th>Booked or confirmed by</th><th>Ref</th></tr>
   ${(t.legs||[]).filter(l=>!pname||(l.person?l.person===pname:personMatch(l.who,pname))).sort((a,b)=>multi&&!pname?((a.person||'').localeCompare(b.person||'')):0).map(l=>`<tr>${multi&&!pname?`<td>${esc(l.person||'')}</td>`:''}<td>${esc(/^\d{4}-\d\d-\d\d$/.test(l.day||'')?dayLabel(l.day):l.day)}</td><td>${esc(l.local)}</td><td>${esc(l.syd)}</td><td>${esc(l.what)}${legExtrasBrief(l)}</td><td>${esc(l.where)}</td><td>${esc(l.who)}</td><td>${l.status==='Gap'?'<span class="blank">Not yet covered</span>':l.status==='Jaya sorting'?'You (sorting it yourself)':esc(l.by)}</td><td>${esc(l.ref)}</td></tr>`).join('')}</table>
+  ${docsBrief(t,pname,multi)}
   <h2>Who meets you and who to call</h2>
   <table><tr><th>Person</th><th>Role</th><th>When and where</th><th>Phone / WeChat / WhatsApp</th></tr>${contacts.map(c=>`<tr><td>${esc(c.person)}</td><td>${esc(c.role)}</td><td>${esc(c.when)}</td><td>${esc(c.phone)}</td></tr>`).join('')}
   <tr><td>Anj Tino</td><td>EA</td><td>Daily check-in${ckIn}</td><td></td></tr></table>
@@ -18970,6 +18982,7 @@ async function downloadPdf(pi=null){
   if(!el){tmp=document.createElement('div'); tmp.style.cssText='position:fixed;left:-10000px;top:0'; tmp.innerHTML=`<div class="briefdoc"></div>`; document.body.appendChild(tmp); el=tmp.firstChild; el.innerHTML=briefHTML(pi)}
   st.textContent='Building the PDF…';
   try{
+    const er=el.getBoundingClientRect(), links=[...el.querySelectorAll('a[href^="http"]')].map(a=>({url:a.href,rects:[...a.getClientRects()].map(r=>({x:r.left-er.left,y:r.top-er.top,w:r.width,h:r.height}))}));
     const canvas=await html2canvas(el,{scale:2,backgroundColor:'#ffffff',useCORS:true});
     const {jsPDF}=window.jspdf; const pdf=new jsPDF({unit:'pt',format:'a4'});
     const pw=pdf.internal.pageSize.getWidth(), ph=pdf.internal.pageSize.getHeight();
@@ -18981,6 +18994,9 @@ async function downloadPdf(pi=null){
       if(page)pdf.addPage();
       pdf.addImage(c.toDataURL('image/jpeg',0.92),'JPEG',0,0,pw,h*pw/canvas.width);
     }
+    // The page is a picture, so lay clickable link areas over each link's position
+    const k=pw/er.width, pages=pdf.internal.getNumberOfPages();
+    for(const ln of links)for(const r of ln.rects){const yAbs=r.y*k, pg=Math.floor(yAbs/ph); if(pg>=pages)continue; pdf.setPage(pg+1); pdf.link(r.x*k,yAbs-pg*ph,r.w*k,r.h*k,{url:ln.url})}
     const who=pi!==null?' - '+(((cur.t.travellers||[])[pi]||{}).name||'traveller'):'';
     const name=('Trip brief - '+tripName(cur)+who).replace(/[\\/:*?"<>|]+/g,'-')+'.pdf';
     if(downloads) await downloads.save({filename:name,data:pdf.output('blob')});
@@ -19167,7 +19183,7 @@ $('#restoreFile').addEventListener('change',async e=>{
     const data=JSON.parse(await file.text()); const incoming=Array.isArray(data)?data:data.trips;
     if(!Array.isArray(incoming))throw 0;
     const byId=new Map(trips.map(t=>[t.id,t]));
-    let added=0; incoming.forEach(t=>{ if(t&&t.id&&t.f&&t.t){ const l=byId.get(t.id); if(!l||t.updated>l.updated){byId.set(t.id,t);added++} } });
+    let added=0; incoming.forEach(t=>{ if(t&&t.id&&t.f&&t.t){ const l=byId.get(t.id); if(!l||t.updated>l.updated){byId.set(t.id,migrateStep(t));added++} } });
     trips=[...byId.values()]; lsSave(); for(const t of trips)if(db&&uid)await persist(t);
     cur=cur?trips.find(t=>t.id===cur.id):trips[0]||null; renderAll();
     toast(added?`Restored ${added} trip${added>1?'s':''}`:'Nothing new in that backup');
@@ -19194,7 +19210,7 @@ setSave(trips.length?'Saved on this device':'');
     downloads=dl;
     if(dbNs&&userNs){ uid=await userNs.id(); if(uid){ db=dbNs;
       const snap=await db.collection('data/users/'+uid).get();
-      const remote=snap.docs.map(d=>d.data()).filter(Boolean).map(d=>JSON.parse(JSON.stringify(d)));
+      const remote=snap.docs.map(d=>d.data()).filter(Boolean).map(d=>migrateStep(JSON.parse(JSON.stringify(d))));
       const byId=new Map(trips.map(t=>[t.id,t]));
       remote.forEach(r=>{const l=byId.get(r.id); if(!l||r.updated>=l.updated)byId.set(r.id,r)});
       const merged=[...byId.values()];
