@@ -235,7 +235,18 @@ table.ed td.nm{font-weight:600;vertical-align:middle;padding-left:.4rem;color:va
 .legcards{display:flex;flex-direction:column;gap:1rem}
 .legcard{border:1px solid var(--line);border-radius:10px;padding:1rem 1.1rem;background:var(--bg)}
 .legcard.is-gap{border-left:4px solid var(--gap)}
-.lc-top{display:grid;grid-template-columns:minmax(9rem,12rem) minmax(0,1fr) auto;gap:.75rem;align-items:start}
+.lc-top{display:grid;grid-template-columns:auto minmax(9rem,12rem) minmax(0,1fr) auto;gap:.75rem;align-items:start}
+.lc-grip{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.1rem;margin-top:1.45rem;width:2.4rem;height:2.6rem;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--muted);cursor:grab;touch-action:none;line-height:1;padding:0}
+.lc-grip span{font-size:1rem}
+.lc-grip b{font-size:.75rem;color:var(--ink)}
+.lc-grip:hover{border-color:var(--accent);color:var(--accent)}
+.legcards.sorting .legcard>:not(.lc-top){display:none}
+.legcards.sorting .lc-top label{pointer-events:none}
+.legcards.sorting{gap:.5rem}
+.legcard.dragging{border-color:var(--accent);box-shadow:0 10px 28px rgba(0,0,0,.35);position:relative;z-index:2}
+.legcard.dragging .lc-grip{cursor:grabbing;background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.legcard.dragging .lc-grip b{color:var(--accent-ink)}
+body.noselect{user-select:none;-webkit-user-select:none;cursor:grabbing}
 .lc-other{margin-top:.4rem}
 .lc-copy{margin-top:.85rem;padding:.85rem 1rem;border:1px solid var(--accent);border-radius:8px;background:var(--surface)}
 .lc-keep{display:flex;gap:.5rem;align-items:center;margin-top:.75rem;font-size:.92rem;cursor:pointer}
@@ -254,8 +265,8 @@ table.ed td.nm{font-weight:600;vertical-align:middle;padding-left:.4rem;color:va
 .lc-acts{gap:.25rem}
 .lc-acts .btn{padding:.35rem .6rem;color:var(--accent)}
 @media (max-width:600px){
-  .lc-top{grid-template-columns:minmax(0,1fr) auto}
-  .lc-top .lc-f:nth-child(2){grid-column:1/-1;grid-row:2}
+  .lc-top{grid-template-columns:auto minmax(0,1fr) auto}
+  .lc-top .lc-f:nth-child(3){grid-column:1/-1;grid-row:2}
   .lx-row{grid-template-columns:minmax(0,1fr) 2rem}
   .lx-row input[data-lx$=":v"]{grid-column:1;grid-row:2}
   .lx-row .del{grid-row:1/3;grid-column:2}
@@ -18627,15 +18638,42 @@ function copyLegTo(src,names,keepRef){
     legs.splice(at+1,0,c);
   }
 }
+// Reorder legs: the cards shown are one person's legs; put them back into the same slots of the full list
+function applyLegOrder(order){
+  const slots=[...order].sort((a,b)=>a-b), moved=order.map(i=>cur.t.legs[i]), L=[...cur.t.legs];
+  slots.forEach((slot,k)=>L[slot]=moved[k]); cur.t.legs=L; legCopyOne=null; queueSave(); refreshDerived(); renderStep();
+}
+let legDrag=null;
+function legDragTo(y){const d=legDrag; if(!d)return;
+  const sibs=[...d.list.querySelectorAll('.legcard')].filter(c=>c!==d.card), next=sibs.find(c=>{const r=c.getBoundingClientRect(); return y<r.top+r.height/2})||null;
+  if(d.card.nextElementSibling!==next&&!(next===null&&d.card===d.list.lastElementChild)){d.list.insertBefore(d.card,next); d.moved=true}}
+function legDragTick(){const d=legDrag; if(!d)return; const top=($('header.top')?.getBoundingClientRect().bottom||0)+50;
+  if(d.y<top)window.scrollBy(0,-14); else if(d.y>innerHeight-60)window.scrollBy(0,14); legDragTo(d.y); requestAnimationFrame(legDragTick)}
+document.addEventListener('pointerdown',e=>{const g=e.target.closest('[data-grip]'); if(!g||!cur||legDrag)return; if(e.button>0)return; e.preventDefault();
+  const card=g.closest('.legcard'), list=card.parentElement; list.classList.add('sorting'); card.classList.add('dragging'); document.body.classList.add('noselect');
+  const r=card.getBoundingClientRect(); window.scrollBy(0,r.top+r.height/2-e.clientY);
+  legDrag={card,list,y:e.clientY,moved:false}; try{g.setPointerCapture(e.pointerId)}catch(_){} requestAnimationFrame(legDragTick)});
+document.addEventListener('pointermove',e=>{if(legDrag){legDrag.y=e.clientY; legDragTo(e.clientY)}});
+function legDragEnd(){const d=legDrag; if(!d)return; legDrag=null; document.body.classList.remove('noselect');
+  const order=[...d.list.querySelectorAll('.legcard')].map(c=>+c.dataset.ri), leg=cur.t.legs[+d.card.dataset.ri];
+  if(d.moved){applyLegOrder(order); toast('Leg moved')} else{d.list.classList.remove('sorting'); d.card.classList.remove('dragging')}
+  const g=document.querySelector(`[data-grip="${cur.t.legs.indexOf(leg)}"]`); if(g){g.closest('.legcard').scrollIntoView({block:'center'}); g.focus({preventScroll:true})}}
+document.addEventListener('pointerup',legDragEnd); document.addEventListener('pointercancel',legDragEnd);
+document.addEventListener('keydown',e=>{const g=e.target.closest&&e.target.closest('[data-grip]'); if(!g||!cur||(e.key!=='ArrowUp'&&e.key!=='ArrowDown'))return; e.preventDefault();
+  const cards=[...document.querySelectorAll('.legcards .legcard')], order=cards.map(c=>+c.dataset.ri), i=order.indexOf(+g.dataset.grip), j=i+(e.key==='ArrowUp'?-1:1);
+  if(j<0||j>=order.length)return; const leg=cur.t.legs[order[i]]; [order[i],order[j]]=[order[j],order[i]]; applyLegOrder(order);
+  const ng=document.querySelector(`[data-grip="${cur.t.legs.indexOf(leg)}"]`); if(ng){ng.focus(); ng.scrollIntoView({block:'nearest'})}},true);
 function legCardsHTML(b,rows,LP,optBtn){
   const top=['status','what'], wide=['where'];
+  let pos=0;
   const cards=rows.map((r,ri)=>{ if(LP&&r.person!==LP)return '';
     const custom=c=>c.k==='what'&&(r.what==='Other'||!LEG_TYPES.includes(r.what))?`<input type="text" class="lc-other" data-legwhat="${ri}" value="${esc(r.what==='Other'?'':r.what)}" placeholder="Type what this leg is, e.g. Visa appointment" aria-label="What this leg is">`:'';
     const field=c=>`<label class="f lc-f ${wide.includes(c.k)?'lc-wide':''}">${esc(c.label)}${cellInput(b,c,r,ri)}${custom(c)}</label>`;
     const extra=(r.extra||[]).map((x,i)=>`<div class="lx-row"><input type="text" list="lxIdeas" data-lx="${ri}:${i}:k" value="${esc(x.k)}" placeholder="Field, e.g. Seat" aria-label="Field name"><input type="text" data-lx="${ri}:${i}:v" value="${esc(x.v)}" placeholder="Detail" aria-label="${esc(x.k||'Field')} detail"><button class="del" data-lxdel="${ri}:${i}" aria-label="Remove field ${esc(x.k)}">×</button></div>`).join('');
     const files=(r.files||[]).map((f,i)=>`<span class="lf-chip"><a href="${esc(f.url)}" target="_blank" rel="noopener" title="${esc(f.name)}">${esc(f.name)}</a><button class="del" data-lfdel="${ri}:${i}" aria-label="Remove ${esc(f.name)}">×</button></span>`).join('');
-    return `<div class="legcard ${(r.status||'Gap')==='Gap'?'is-gap':''}">
-      <div class="lc-top">${b.cols.filter(c=>top.includes(c.k)).map(field).join('')}<button class="del lc-del" data-del="legs:${ri}" aria-label="Remove leg ${ri+1}" title="Remove this leg">×</button></div>
+    pos++;
+    return `<div class="legcard ${(r.status||'Gap')==='Gap'?'is-gap':''}" data-ri="${ri}">
+      <div class="lc-top"><button type="button" class="lc-grip" data-grip="${ri}" aria-label="Move leg ${pos}, ${esc(r.what||'')}. Drag, or use the up and down arrow keys" title="Drag to move this leg"><span aria-hidden="true">⠿</span><b>${pos}</b></button>${b.cols.filter(c=>top.includes(c.k)).map(field).join('')}<button class="del lc-del" data-del="legs:${ri}" aria-label="Remove leg ${ri+1}" title="Remove this leg">×</button></div>
       <div class="lc-grid">${b.cols.filter(c=>!top.includes(c.k)).map(field).join('')}</div>
       <div class="lc-more"><div class="lc-h">Extra details</div>${extra}
         ${files?`<div class="lf-list">${files}</div>`:''}
