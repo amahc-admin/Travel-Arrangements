@@ -364,9 +364,10 @@ const STEPS = [
      {k:'destination',label:'Destination(s)',type:'cities',wide:true},
      {k:'dateOut',label:'Leaves',type:'date',days:true},
      {k:'dateBack',label:'Back',type:'date',days:true},
+     {k:'scope',label:'Domestic or international',type:'scope',rerender:true},
      {k:'kind',label:'Work or personal',type:'select',options:['Work','Personal'],rerender:true},
      {k:'team',label:'Team trip (several people)?',type:'select',options:['No','Yes'],rerender:true},
-     {k:'china',label:'China or another WeChat country?',type:'select',options:['No','Yes'],rerender:true},
+     {k:'china',label:'China or another WeChat country?',type:'select',options:['No','Yes'],rerender:true,showIf:'intl'},
      {k:'purpose',label:'Purpose (choose all that apply)',type:'purpose',wide:true},
      {k:'days',label:'Purpose of each day',type:'dayplan',wide:true},
      {k:'meeting',label:'Who he’s meeting, and who needs to know he’s coming',type:'textarea',wide:true},
@@ -381,9 +382,9 @@ const STEPS = [
  {id:'research', title:'Research', when:'Before any options',
   lead:'Check every item against the profile. If the profile doesn’t answer it, it goes on the booking check as a question.',
   blocks:[
-   {type:'countries'},
+   {type:'countries', showIf:'intl'},
    {type:'note', html:PROFILE_NOTE},
-   {type:'fields', title:'Entry, insurance and money', fields:[
+   {type:'fields', title:'Entry, insurance and money', showIf:'intl', fields:[
      {k:'entryRoute',label:'Entry route (visa or visa-free, length of stay)',wide:true},
      {k:'entryLink',label:'Official site checked (link)',type:'url'},
      {k:'entryDate',label:'Date checked',type:'date'},
@@ -400,9 +401,9 @@ const STEPS = [
      'Train class from the profile, or asked',
      'Hotel default for the city, or event hotel before the group-rate deadline',
      'Arrival after 10pm or before 7am: car with a sign to pre-book',
-     'Entry rules checked on the official site today, for every country and every traveller’s passport',
-     'Passport valid 6+ months past return for every traveller',
-     'Travel insurance in place']}
+     {t:'Entry rules checked on the official site today, for every country and every traveller’s passport',showIf:'intl'},
+     {t:'Passport valid 6+ months past return for every traveller',showIf:'intl'},
+     {t:'Travel insurance in place',showIf:'intl'}]}
  ]},
  {id:'check', title:'Booking check', when:'Wait for “yes”',
   lead:'Fill in the options and copy the message to Jaya. Nothing is paid until he replies “yes”. Silence is not a yes.',
@@ -452,11 +453,11 @@ const STEPS = [
    {type:'checks', title:'Work trip', showIf:'work', items:['Paid on the OPEX card, booked in the admin@ Trip.com account']},
    {type:'checks', title:'Personal trip', showIf:'personal', items:['Paid on Jaya’s personal card, never the OPEX card','Booked in his personal account, never admin@']},
    {type:'checks', title:'Done', items:[
-     'Name on every ticket exactly as on the passport, middle name included','Return booked with the outbound, changeable fare',
+     {t:'Name on every ticket exactly as on the passport, middle name included',dom:'Name on every ticket exactly as on photo ID, middle name included'},'Return booked with the outbound, changeable fare',
      'Travelling together: one booking, seats side by side','Companions sent their own tickets and hotel details',
      'Lounge access for every flight','In-flight Wi-Fi bought',
      'Every booking in Jaya’s calendar in local time, with confirmation, address and cancellation deadline',
-     'All PDFs (tickets, hotel, entry, insurance) in the trip folder',
+     {t:'All PDFs (tickets, hotel, entry, insurance) in the trip folder',dom:'All PDFs (tickets, hotel) in the trip folder'},
      'Hotel paid and confirmation with Jaya 48 hours before check-in',
      'Checked in online when it opened, seats picked, boarding pass sent']},
    {type:'table', title:'Rooming list', showIf:'team', key:'rooming', cols:[
@@ -494,7 +495,7 @@ const STEPS = [
      'Every local contact told the dates and plan','Confirmed who meets Jaya, where and when',
      'Pick-ups confirmed with the driver, with a phone number for each side',
      'Jaya and companions have each other’s, the drivers’ and the hosts’ numbers',
-     'Taxi address cards in the local language for every hotel and meeting']}, 
+     {t:'Taxi address cards in the local language for every hotel and meeting',showIf:'intl'}]}, 
    {type:'checks', title:'Team', showIf:'work', items:['Team (Ross, managers) told he’s away and when he’s reachable']},
    {type:'checks', title:'Personal trip privacy', showIf:'personal', items:['Team told only that he’s away and when he’s reachable, never where','Nothing about the trip posted in a team channel']},
    {type:'fields', title:'WeChat trip group', showIf:'china', fields:[{k:'wechatGroup',label:'Group name'},{k:'davidItin',label:'Date David’s itinerary arrived',type:'date'}]},
@@ -513,10 +514,10 @@ const STEPS = [
    {type:'table', title:'By city', key:'cities', cols:[
      {k:'city',label:'City'},{k:'contact',label:'Emergency contact (can reach him in person)'},{k:'phone',label:'Phone / WeChat / WhatsApp'},{k:'desk',label:'Hotel front desk'}]},
    {type:'fields', title:'Other contacts', fields:[
-     {k:'consulate',label:'Australian embassy or consulate (name, phone, address)',type:'textarea',wide:true},
-     {k:'smartraveller',label:'Smartraveller page',type:'url'},
+     {k:'consulate',label:'Australian embassy or consulate (name, phone, address)',type:'textarea',wide:true,showIf:'intl'},
+     {k:'smartraveller',label:'Smartraveller page',type:'url',showIf:'intl'},
      {k:'auContact',label:'Jaya’s emergency contact in Australia'}]},
-   {type:'checks', title:'Done', items:['Contact for every city he stays in','Hotel desk number and local-language address for each night','Consulate noted','Smartraveller alerts subscribed','Insurance policy and 24-hour line noted (Research step)','Offline copy saved']},
+   {type:'checks', title:'Done', items:['Contact for every city he stays in',{t:'Hotel desk number and local-language address for each night',dom:'Hotel desk number and address for each night'},{t:'Consulate noted',showIf:'intl'},{t:'Smartraveller alerts subscribed',showIf:'intl'},{t:'Insurance policy and 24-hour line noted (Research step)',showIf:'intl'},'Offline copy saved']},
    {type:'note', html:'<p>If Jaya goes quiet (check-in missed by 2 hours, or a missed flight, pick-up or meeting): call his mobile (a normal call), then WhatsApp and WeChat, then the city contact, then the hotel. After 6 hours, his contact in Australia, then the consulate. Log each step below.</p>'},
    {type:'table', title:'Contact log', key:'quietLog', cols:[{k:'time',label:'Time'},{k:'step',label:'What you did'},{k:'result',label:'Result'}]}
  ]},
@@ -538,7 +539,7 @@ const STEPS = [
    {type:'teamgaps'},
    {type:'teamgrid', title:'Each person'},
    {type:'checks', title:'Done', items:[
-     'Jaya’s “yes” covers every traveller’s booking','Names on tickets exactly as on each passport',
+     'Jaya’s “yes” covers every traveller’s booking',{t:'Names on tickets exactly as on each passport',dom:'Names on tickets exactly as on each person’s photo ID'},
      'People on the same flight seated together where possible','Each person sent their own tickets, hotel details and personal brief',
      'Dietary needs sent to restaurants and the venue','Everyone in the trip group chat, with each other’s numbers',
      'Team told the plan and who to call on the day']}
@@ -18538,9 +18539,16 @@ async function removeTrip(trip){
 }
 
 /* ---------- visibility + progress ---------- */
+// Domestic means every destination is in Australia; it can also be set by hand in Intake
+function autoScope(t=cur){const cs=[...new Set((t.f.destination||'').split(/[,;]+/).map(x=>x.trim()).filter(Boolean).map(x=>findCity(x)?.country||'?'))]; return cs.length&&cs.every(c=>c==='Australia'||c==='AU')?'Domestic':'International'}
+function scopeOf(t=cur){return t.f.scope||autoScope(t)}
+function isIntl(t=cur){return scopeOf(t)!=='Domestic'}
+const itemText=(it,t=cur)=>typeof it==='string'?it:(!isIntl(t)&&it.dom)||it.t;
 function shows(b,t=cur){
   if(!b.showIf)return true;
-  if(b.showIf==='china')return t.f.china==='Yes';
+  if(b.showIf==='intl')return isIntl(t);
+  if(b.showIf==='domestic')return !isIntl(t);
+  if(b.showIf==='china')return t.f.china==='Yes'&&isIntl(t);
   if(b.showIf==='personal')return t.f.kind==='Personal';
   if(b.showIf==='work')return t.f.kind!=='Personal';
   if(b.showIf==='team')return t.f.team==='Yes';
@@ -18549,7 +18557,7 @@ function shows(b,t=cur){
 function stepProgress(si,t=cur){
   let total=0,done=0;
   STEPS[si].blocks.forEach((b,bi)=>{ if(b.type!=='checks'||!shows(b,t))return;
-    b.items.forEach((_,ii)=>{total++; if(t.c[`${STEPS[si].id}.${bi}.${ii}`])done++;});});
+    b.items.forEach((it,ii)=>{if(!shows(it,t))return; total++; if(t.c[`${STEPS[si].id}.${bi}.${ii}`])done++;});});
   return {total,done};
 }
 let placeTimer=null, placeTarget=null, placeMatches=[], placeHi=0, placeSeq=0, placeSkip=false;
@@ -18890,6 +18898,8 @@ function fieldHTML(f){
   if(f.type==='dayplan')return dayPlanHTML(f);
   if(f.type==='times')return timesHTML(f);
   if(f.type==='budget')return budgetHTML(f);
+  if(f.type==='scope'){const v=scopeOf(), auto=!cur.f.scope;
+    return `<label class="f">${esc(f.label)}<select data-f="scope" data-rr="1">${['International','Domestic'].map(o=>`<option value="${o}" ${o===v?'selected':''}>${o==='Domestic'?'Domestic (within Australia)':o}</option>`).join('')}</select>${auto?`<small class="status">Worked out from the destinations</small>`:''}</label>`}
   const v=cur.f[f.k]??''; const attrs=`data-f="${f.k}" ${f.rerender?'data-rr="1"':''} ${f.ph?`placeholder="${esc(f.ph)}"`:''}`;
   let input;
   if(f.type==='textarea')input=`<textarea ${attrs}>${esc(v)}</textarea>`;
@@ -19177,11 +19187,11 @@ function renderStep(){
     if(!shows(b))return;
     if(b.type==='note'){html+=`<section class="block note">${b.html}</section>`;return}
     html+=`<section class="block">${b.title&&b.type!=='flights'?`<h2>${esc(titleCase(b.title))}</h2>`:''}`;
-    if(b.type==='fields')html+=`<div class="grid">${b.fields.map(fieldHTML).join('')}</div>`;
+    if(b.type==='fields')html+=`<div class="grid">${b.fields.filter(f=>shows(f)).map(fieldHTML).join('')}</div>`;
     if(b.type==='table'&&b.perPerson)html+=legViewToggleHTML()+(cur.legView==='overview'?legOverviewHTML():cur.legView==='map'?legMapHTML():legTabsHTML()+legStartHTML()+tableHTML(b)+legCopyHTML());
     else if(b.type==='table')html+=tableHTML(b);
     if(b.type==='flights')html+=flightAddHTML()+tableHTML(b);
-    if(b.type==='checks')html+=`<ul class="checks">${b.items.map((it,ii)=>{const k=`${s.id}.${bi}.${ii}`;return `<li><label><input type="checkbox" data-check="${k}" ${cur.c[k]?'checked':''}><span>${esc(it)}</span></label></li>`}).join('')}</ul>`;
+    if(b.type==='checks')html+=`<ul class="checks">${b.items.map((it,ii)=>{if(!shows(it))return ''; const k=`${s.id}.${bi}.${ii}`;return `<li><label><input type="checkbox" data-check="${k}" ${cur.c[k]?'checked':''}><span>${esc(itemText(it))}</span></label></li>`}).join('')}</ul>`;
     if(b.type==='countries'){const cs=routeCountries(),un=unlistedCities();
       html+=`<h2>Entry rules to check</h2>`+(cs.length||un.length?`<p class="status">Check each on the official government or embassy site today, for every traveller’s passport.</p><ul class="countries">${cs.map(c=>`<li>${esc(c)}</li>`).join('')}${un.map(c=>`<li>${esc(c)} (country not recognised, check which it is)</li>`).join('')}</ul>`:`<p class="status">Add destinations in the Intake step and the countries show here.</p>`);}
     if(b.type==='teamgaps')html+=`<h2>Coverage</h2><div id="teamGaps">${teamGapsHTML()}</div>`;
@@ -19251,17 +19261,17 @@ function briefBody(pi=null){
   <tr><td>Anj Tino</td><td>EA</td><td>Daily check-in${ckIn}</td><td></td></tr></table>
   <h2>Emergency plan</h2>
   <table><tr><th>City</th><th>Emergency contact (can reach you in person)</th><th>Phone / WeChat / WhatsApp</th><th>Hotel front desk</th></tr>${rowsOf(t.cities||[],['city','contact','phone','desk'])}</table>
-  <ul><li>Australian embassy or consulate: ${B(f.consulate)}</li>
-  <li>Travel insurance: ${B(f.insPolicy)} · 24-hour emergency line: ${B(f.insLine)}</li>
+  <ul>${isIntl()?`<li>Australian embassy or consulate: ${B(f.consulate)}</li>
+  <li>Travel insurance: ${B(f.insPolicy)} · 24-hour emergency line: ${B(f.insLine)}</li>`:''}
   <li>Your emergency contact in Australia: ${B(f.auContact)}</li>
   <li>If you go quiet (missed check-in by 2 hours, or a missed flight or pick-up): I call your mobile, then WhatsApp and WeChat, then the city contact, then the hotel. After 6 hours, your contact in Australia, then the consulate.</li>
-  ${f.china==='Yes'?`<li>WeChat trip group for arrivals: ${B(f.wechatGroup)} (you, David, the hosts’ logistics contacts)</li>`:''}</ul>
-  <h2>Documents and money</h2>
+  ${f.china==='Yes'&&isIntl()?`<li>WeChat trip group for arrivals: ${B(f.wechatGroup)} (you, David, the hosts’ logistics contacts)</li>`:''}</ul>
+  ${isIntl()?`<h2>Documents and money</h2>
   <ul><li>Passport valid 6+ months past return</li>
   <li>Entry: ${B(f.entryRoute)}, checked on ${B(f.entryLink)} on ${B(f.entryDate)}</li>
   <li>Tickets, hotel and insurance PDFs in the trip folder</li>
   <li>Cards: ${B(f.cards)}; local payments: ${B(f.localPay)}; cash: ${B(f.cash)}</li>
-  <li>Phone: ${B(f.phone)}${f.china==='Yes'?'. In mainland China, Google, Gmail, WhatsApp and Slack need roaming data or a plan that works there':''}</li></ul>
+  <li>Phone: ${B(f.phone)}${f.china==='Yes'?'. In mainland China, Google, Gmail, WhatsApp and Slack need roaming data or a plan that works there':''}</li></ul>`:''}
   <h2>Return plan</h2>
   <ul><li>Transfer to the airport: ${B(f.retTransfer)}</li><li>Before you leave: ${B(f.retBefore)}</li><li>Back at work: ${B(f.retWork)}</li></ul>
   ${decisions.length&&!P?`<h2>Open decisions (need your answer)</h2><table><tr><th>Decision</th><th>Options</th><th>Recommendation</th><th>Needed by</th></tr>${rowsOf(decisions,['decision','options','rec','by'])}</table>`:''}`;
