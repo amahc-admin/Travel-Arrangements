@@ -18400,7 +18400,7 @@ function expensesHTML(){
         <div class="row lc-acts"><button type="button" class="btn quiet" data-expattach="${i}">Attach invoice or receipt</button><button type="button" class="btn quiet" data-explink="${i}">Add link</button><button type="button" class="btn quiet exp-del" data-expdel="${i}">Remove expense</button></div></div>
     </div>`}).join('');
   return `<div id="expSum">${expSummaryHTML()}</div><div id="expDoc">${expDocHTML()}</div><div class="expcards">${rows}</div>
-    <div class="row" style="margin-top:.75rem"><button type="button" class="btn add" data-expadd="1">Add expense</button>${ex.length?'<button type="button" class="btn quiet add" data-expcsv="1">Download CSV</button>':''}</div>`;
+    <div class="row" style="margin-top:.75rem"><button type="button" class="btn add" data-expadd="1">Add expense</button>${ex.length?'<button type="button" class="btn add" data-expxlsx="1">Download Excel</button><button type="button" class="btn quiet add" data-expcsv="1">Download CSV</button>':''}</div>`;
 }
 async function attachToExpense(e,files){
   if(!GOOGLE_CLIENT_ID){alert('Google Drive isn’t connected to this site yet. Upload the invoice or receipt to Google Drive yourself, copy its link, and use “Add link”.');return}
@@ -18455,6 +18455,27 @@ function expDocHTML(){
   return `<div class="exp-doc"><span>📄 <a href="${esc(d.url)}" target="_blank" rel="noopener"><b>Expense report</b></a> · ${driveReady()?'updates automatically':'updates when you’re signed in to Google'}${ago!==null?` · last updated ${ago<1?'just now':ago<60?ago+' min ago':new Date(d.updated).toLocaleString('en-AU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}`:''}</span><button type="button" class="btn quiet" data-expdoc="1">Update now</button></div>`;
 }
 function refreshExpDoc(){const el=document.getElementById('expDoc'); if(el&&cur)el.innerHTML=expDocHTML()}
+// Excel download: real dates and numbers, columns sized to fit, invoice links clickable, totals per currency
+let xlsxReady=null;
+function loadXlsx(){if(window.XLSX)return Promise.resolve(); return xlsxReady=xlsxReady||new Promise((res,rej)=>{const sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; sc.onload=res; sc.onerror=()=>{xlsxReady=null; rej(new Error('load'))}; document.head.appendChild(sc)})}
+async function expensesXlsx(){
+  try{await loadXlsx()}catch(_){toast('Couldn’t load the Excel tools. Check the connection and try again');return}
+  const ex=expensesList(), head=['Date','For','Category','What','Amount','Currency','Paid with','Status','Invoice or receipt','All invoice links'];
+  const rows=ex.map(e=>{const d=/^\d{4}-\d\d-\d\d$/.test(e.date||'')?new Date(+e.date.slice(0,4),+e.date.slice(5,7)-1,+e.date.slice(8,10)):(e.date||''), f=e.files||[];
+    return [d,expForFull(e),e.cat||'Other',e.desc||'',expNum(e.amount),e.cur||'AUD',e.paid||'OPEX card',e.status||'Paid',f.map(x=>x.name).join(', ')||'Missing',f.map(x=>x.url).join(' ')]});
+  const curs=[...new Set(ex.map(e=>e.cur||'AUD'))], n=rows.length+1;
+  const totals=curs.map(c=>['','','','Total '+c,{f:`SUMIF(F2:F${n},"${c}",E2:E${n})`},c]);
+  const ws=XLSX.utils.aoa_to_sheet([head,...rows,[],...totals],{dateNF:'d mmm yyyy'});
+  rows.forEach((r,i)=>{const R=i+2, dc=ws['A'+R], ac=ws['E'+R], ic=ws['I'+R], f=ex[i].files||[];
+    if(dc&&ex[i].date)dc.z='d mmm yyyy'; if(ac)ac.z='#,##0.00'; if(ic&&f[0])ic.l={Target:f[0].url,Tooltip:'Open '+f[0].name}});
+  totals.forEach((_,i)=>{const c=ws['E'+(n+2+i)]; if(c){c.z='#,##0.00'; c.t='n'}});
+  const width=k=>Math.min(60,Math.max(head[k].length,...rows.map(r=>k===0?12:String(r[k]??'').length))+2);
+  ws['!cols']=head.map((_,k)=>({wch:k===9?40:width(k)})); ws['!autofilter']={ref:`A1:J${n}`};
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Expenses');
+  const blob=new Blob([XLSX.write(wb,{bookType:'xlsx',type:'array'})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const name=('Expenses - '+tripName(cur)).replace(/[\\/:*?"<>|]+/g,'-')+'.xlsx';
+  if(downloads){try{await downloads.save({filename:name,data:blob})}catch(_){}} else{const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000)}
+}
 async function expensesCsv(){
   const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
   const lines=[['Date','For','Category','What','Amount','Currency','Paid with','Status','Invoices and receipts'].map(q).join(',')]
@@ -19487,6 +19508,7 @@ document.addEventListener('click',async e=>{
     const name=(prompt('What should this link be called?','Invoice')||'').trim()||'Receipt'; const x=expensesList()[+xl.dataset.explink]; (x.files=x.files||[]).push({name,url}); queueSave(); renderStep(); expDocSoon(); return}
   const xf=e.target.closest('[data-expfdel]'); if(xf&&cur){const [i,j]=xf.dataset.expfdel.split(':'); const x=expensesList()[+i]; if(!confirm(`Remove “${x.files[+j].name}”? The file stays in Google Drive.`))return; x.files.splice(+j,1); queueSave(); renderStep(); expDocSoon(); return}
   if(e.target.closest('[data-expcsv]')&&cur){expensesCsv(); return}
+  if(e.target.closest('[data-expxlsx]')&&cur){expensesXlsx(); return}
   if(e.target.closest('[data-expdoc]')&&cur){if(!GOOGLE_CLIENT_ID){toast('Google Drive isn’t connected to this site');return} const trip=cur;
     if(!driveReady()){driveSignIn(()=>syncExpenseDoc(trip,true)); return} syncExpenseDoc(trip,true); return}
   if(e.target.closest('[data-consfill]')&&cur){if(cur.f.consulate&&cur.f.consulate!==cur.f.consulateAuto&&!confirm('Replace what’s in the embassy box with the details for the destinations?'))return; autoConsulate(true); return}
