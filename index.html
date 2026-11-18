@@ -121,7 +121,9 @@ ul.countries{margin:.25rem 0 0;padding-left:1.1rem}
 .sw.fx{background:var(--accent)}
 .sw.fl{border:2px dashed var(--accent)}
 .tlist{margin-top:.75rem}
-.trow{display:grid;grid-template-columns:7.5rem 5.5rem 7.5rem minmax(0,1fr) 2rem;gap:.5rem;align-items:center;padding:.4rem 0;border-top:1px solid var(--line)}
+.trow{display:grid;grid-template-columns:7.5rem 5.5rem 7.5rem minmax(0,1fr) 6.5rem 2rem;gap:.5rem;align-items:center;padding:.4rem 0;border-top:1px solid var(--line)}
+.trow.sub{border-top:0;padding-top:0}
+.tm-add{padding:.3rem .55rem;color:var(--accent);font-size:.85rem;white-space:nowrap}
 .trow:first-child{border-top:0}
 .trow .d{font-weight:600;color:var(--ink)}
 .tag{font-size:.78rem;border-radius:999px;padding:.1rem .55rem;text-align:center}
@@ -129,8 +131,11 @@ ul.countries{margin:.25rem 0 0;padding-left:1.1rem}
 .tag.fl{border:1.5px dashed var(--accent);color:var(--accent)}
 .brow{display:grid;grid-template-columns:6rem 10rem minmax(0,13rem) 2rem;gap:.5rem;align-items:center;margin-bottom:.45rem}
 @media (max-width:600px){
-  .trow{grid-template-columns:1fr auto}
-  .trow input[type=text]{grid-column:1/-1}
+  .trow{grid-template-columns:minmax(0,1fr) auto auto}
+  .trow .d{grid-column:1;grid-row:1}.trow .tag{grid-column:2;grid-row:1}.trow>.del{grid-column:3;grid-row:1}
+  .trow input[type=time]{grid-column:1;grid-row:2}.trow .tm-add{grid-column:2/4;grid-row:2}
+  .trow input[type=text]{grid-column:1/-1;grid-row:3}
+  .trow.sub>span{display:none}.trow.sub input[type=time]{grid-row:1}.trow.sub input[type=text]{grid-row:2}
   .brow{grid-template-columns:5.5rem 1fr 2rem}
   .brow select[data-bud$="|for"]{grid-column:1/3}
 }
@@ -18327,7 +18332,8 @@ function timesInner(){
     cells+=`<button type="button" class="${cls}" data-cal="${iso}" aria-pressed="${!!t}" aria-label="${esc(dayLabel(iso))}${t?', '+t.kind.toLowerCase():''}">${d}</button>`}
   const month=first.toLocaleDateString('en-AU',{month:'long',year:'numeric',timeZone:'UTC'});
   const list=Object.keys(cur.times).sort().map(iso=>{const t=cur.times[iso]; const L=esc(dayLabel(iso));
-    return `<div class="trow"><span class="d">${L}</span><span class="tag ${t.kind==='Fixed'?'fx':'fl'}">${t.kind}</span><input type="time" data-tm="${iso}|time" value="${esc(t.time||'')}" aria-label="Time on ${L}"><input type="text" data-tm="${iso}|note" value="${esc(t.note||'')}" placeholder="What’s on (e.g. event opening, supplier meeting)" aria-label="What’s on ${L}"><button type="button" class="del" data-tmdel="${iso}" aria-label="Remove ${L}">×</button></div>`}).join('');
+    const more=(t.more||[]).map((x,i)=>`<div class="trow sub"><span class="d" aria-hidden="true"></span><span></span><input type="time" data-tm="${iso}|more|${i}|time" value="${esc(x.time||'')}" aria-label="Another time on ${L}"><input type="text" data-tm="${iso}|more|${i}|note" value="${esc(x.note||'')}" placeholder="What’s on at this time" aria-label="What’s on at this time, ${L}"><span></span><button type="button" class="del" data-tmsub="${iso}|${i}" aria-label="Remove this time on ${L}">×</button></div>`).join('');
+    return `<div class="trow"><span class="d">${L}</span><span class="tag ${t.kind==='Fixed'?'fx':'fl'}">${t.kind}</span><input type="time" data-tm="${iso}|time" value="${esc(t.time||'')}" aria-label="Time on ${L}"><input type="text" data-tm="${iso}|note" value="${esc(t.note||'')}" placeholder="What’s on (e.g. event opening, supplier meeting)" aria-label="What’s on ${L}"><button type="button" class="btn quiet tm-add" data-tmadd="${iso}" title="Add another time on this day">+ Add time</button><button type="button" class="del" data-tmdel="${iso}" aria-label="Remove ${L}">×</button></div>${more}`}).join('');
   return `<div class="calbar"><div class="pills" role="group" aria-label="Mark dates as">${['Fixed','Flexible'].map(k=>`<button type="button" class="pill" data-calmode="${k}" aria-pressed="${calMode===k}">Mark as ${k.toLowerCase()}</button>`).join('')}</div></div>
   <div class="cal"><div class="calhead"><button type="button" class="btn quiet" data-calnav="-1" aria-label="Previous month">‹</button><strong>${esc(month)}</strong><button type="button" class="btn quiet" data-calnav="1" aria-label="Next month">›</button></div>
   <div class="calgrid">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(w=>`<span class="wd">${w}</span>`).join('')}${cells}</div>
@@ -19230,7 +19236,7 @@ function briefBody(pi=null){
      if(ds.length)return `<li>Each day:<ul>${ds.map(d=>{const e=cur.dp[d];return `<li>${esc(dayLabel(d))}: ${esc((e.tags||[]).join(', '))}${e.note?`${(e.tags||[]).length?' · ':''}${esc(e.note)}`:''}</li>`}).join('')}</ul></li>`;
      return f.days?`<li>Days: ${esc(f.days)}</li>`:'';})()}
   ${(()=>{const fx=Object.keys(cur.times||{}).sort().filter(d=>cur.times[d].kind==='Fixed');
-     return fx.length?`<li>Fixed times:<ul>${fx.map(d=>{const t=cur.times[d];return `<li>${esc(dayLabel(d))}${t.time?` ${esc(t.time)}`:''}${t.note?`: ${esc(t.note)}`:''}</li>`}).join('')}</ul></li>`:'';})()}
+     return fx.length?`<li>Fixed times:<ul>${fx.flatMap(d=>{const t=cur.times[d]; return [t,...(t.more||[])].filter(x=>x.time||x.note).sort((a,b)=>(a.time||'').localeCompare(b.time||'')).map(x=>`<li>${esc(dayLabel(d))}${x.time?` ${esc(x.time)}`:''}${x.note?`: ${esc(x.note)}`:''}</li>`)}).join('')}</ul></li>`:'';})()}
   ${team||flightRows().length||!(f.outFlight||f.backFlight)?'':`<li>Out: ${B(f.outDay)}, ${B(f.outFlight)}, ${B(f.outDep)} → ${B(f.outArr)} (${B(f.outSyd)} Sydney)</li>
   <li>Back: ${B(f.backDay)}, ${B(f.backFlight)}, ${B(f.backDep)} → ${B(f.backArr)} Sydney</li>`}
   <li>Staying: ${hotels.length?hotels.map(h=>`${esc(h.name)}${h.nights?`, ${esc(h.nights)} nights`:''}${h.addrEn?`, ${esc(h.addrEn)}`:''}${h.addrLocal?` / ${esc(h.addrLocal)}`:''}`).join('; '):'<span class="blank">[hotel]</span>'}</li></ul>
@@ -19306,7 +19312,7 @@ document.addEventListener('input',e=>{
     row[k]=el.type==='checkbox'?el.checked:el.value; if(el.tagName==='SELECT')el.classList.toggle('st-gap',el.value==='Gap');
     queueSave(); refreshDerived(); return}
   if(el.id==='purposeOther'){purposeSel(); cur.f.purposeOther=el.value; syncPurpose(); queueSave(); refreshDerived(); return}
-  if(el.dataset.tm!==undefined){const [d,k]=el.dataset.tm.split('|'); if(cur.times&&cur.times[d]){cur.times[d][k]=el.value; queueSave(); refreshDerived()} return}
+  if(el.dataset.tm!==undefined){const [d,k,i,k2]=el.dataset.tm.split('|'); const t=cur.times&&cur.times[d]; if(t){if(k==='more'){if(t.more&&t.more[+i])t.more[+i][k2]=el.value} else t[k]=el.value; queueSave(); refreshDerived()} return}
   if(el.dataset.bud!==undefined){const [i,k]=el.dataset.bud.split('|'); if(k==='a'){const v=el.value.replace(/[^0-9.,]/g,''); if(v!==el.value)el.value=v}
     cur.budget[+i][k]=el.value; queueSave(); return}
   if(el.dataset.daynote!==undefined){cur.dp=cur.dp||{}; const d=el.dataset.daynote; (cur.dp[d]=cur.dp[d]||{tags:[],note:''}).note=el.value; queueSave(); refreshDerived(); return}
@@ -19386,8 +19392,10 @@ document.addEventListener('click',async e=>{
   const cm=e.target.closest('[data-calmode]'); if(cm&&cur){calMode=cm.dataset.calmode; refreshTimes(`[data-calmode="${calMode}"]`); return}
   const cn=e.target.closest('[data-calnav]'); if(cn&&cur){const [y,m]=calView.split('-').map(Number); const d=new Date(Date.UTC(y,m-1+(+cn.dataset.calnav),1)); calView=d.toISOString().slice(0,7); refreshTimes(`[data-calnav="${cn.dataset.calnav}"]`); return}
   const cd=e.target.closest('[data-cal]'); if(cd&&cur){const iso=cd.dataset.cal; cur.times=cur.times||{}; const t=cur.times[iso];
-    if(t&&t.kind===calMode)delete cur.times[iso]; else cur.times[iso]={kind:calMode,time:t?t.time:'',note:t?t.note:''};
+    if(t&&t.kind===calMode)delete cur.times[iso]; else cur.times[iso]={kind:calMode,time:t?t.time:'',note:t?t.note:'',...(t&&t.more?{more:t.more}:{})};
     queueSave(); refreshTimes(`[data-cal="${iso}"]`); refreshDerived(); return}
+  const ta=e.target.closest('[data-tmadd]'); if(ta&&cur){const iso=ta.dataset.tmadd, t=cur.times[iso]; (t.more=t.more||[]).push({time:'',note:''}); queueSave(); refreshTimes(`[data-tm="${iso}|more|${t.more.length-1}|time"]`); return}
+  const ts=e.target.closest('[data-tmsub]'); if(ts&&cur){const [iso,i]=ts.dataset.tmsub.split('|'); cur.times[iso].more.splice(+i,1); queueSave(); refreshTimes(); refreshDerived(); return}
   const td=e.target.closest('[data-tmdel]'); if(td&&cur){delete cur.times[td.dataset.tmdel]; queueSave(); refreshTimes(); refreshDerived(); return}
   if(e.target.closest('[data-budadd]')&&cur){const last=cur.budget[cur.budget.length-1]; cur.budget.push({c:last?last.c:'AUD',a:'',for:'Whole trip'}); queueSave(); refreshBudget(); const ins=document.querySelectorAll('[data-bud$="|a"]'); if(ins.length)ins[ins.length-1].focus(); return}
   const bd=e.target.closest('[data-buddel]'); if(bd&&cur){cur.budget.splice(+bd.dataset.buddel,1); queueSave(); refreshBudget(); return}
