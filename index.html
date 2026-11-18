@@ -262,6 +262,8 @@ body.noselect{user-select:none;-webkit-user-select:none;cursor:grabbing}
 .exp-noinv{color:var(--gap);font-size:.88rem}
 .exp-del{margin-left:auto}
 .lc-acts .btn.exp-del{color:var(--muted)}
+.exp-doc{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.5rem 1rem;padding:.6rem 1rem;border:1px solid var(--line);border-radius:10px;background:var(--surface);margin:.5rem 0 0;font-size:.92rem;color:var(--muted)}
+.exp-doc a{color:var(--accent)}
 .exp-sum{padding:.75rem 1rem;border:1px solid var(--line);border-radius:10px;background:var(--bg);margin-bottom:.5rem}
 .exp-total{display:flex;flex-wrap:wrap;align-items:baseline;gap:.25rem .75rem}
 .exp-total b{font-size:1.35rem}
@@ -364,13 +366,11 @@ const STEPS = [
      {k:'days',label:'Purpose of each day',type:'dayplan',wide:true},
      {k:'meeting',label:'Who he’s meeting, and who needs to know he’s coming',type:'textarea',wide:true},
      {k:'fixedTimes',label:'Fixed and flexible dates',type:'times',wide:true},
-     {k:'budget',label:'Budget limits',type:'budget',wide:true},
-     {k:'unusual',label:'Anything unusual (samples, cash, companions)',type:'textarea',wide:true},
      {k:'selfSorted',label:'Legs Jaya will sort himself',type:'textarea',wide:true}]},
    {type:'table', title:'Travellers', key:'travellers', cols:[
      {k:'name',label:'Name',w:10},{k:'from',label:'Flying from',team:true,city:true,w:9},{k:'mobile',label:'Mobile',w:8},{k:'chat',label:'WhatsApp / WeChat',china:true,w:8},{k:'email',label:'Email',w:11},{k:'room',label:'Room',team:true,optional:true,w:7},{k:'notes',label:'Dietary or notes',optional:true,w:9}]},
    {type:'note', html:'<p>Passport details for every traveller go in 1Password only, never here.</p>'},
-   {type:'checks', title:'Done', items:['Work or personal noted','Every traveller’s mobile and email noted','Where, when and the purpose of each day','Who he’s meeting and who needs to know','Fixed and flexible times','Budget limits or anything unusual','Legs Jaya will sort himself written down']},
+   {type:'checks', title:'Done', items:['Work or personal noted','Every traveller’s mobile and email noted','Where, when and the purpose of each day','Who he’s meeting and who needs to know','Fixed and flexible times','Legs Jaya will sort himself written down']},
    {type:'checks', title:'China', showIf:'china', items:['David Zheng told the dates today']}
  ]},
  {id:'research', title:'Research', when:'Before any options',
@@ -475,10 +475,10 @@ const STEPS = [
      'Confirmations in the trip folder']}
  ]},
  {id:'expenses', title:'Expenses', when:'As money is spent',
-  lead:'Every cost for the trip, with its invoice or receipt attached. Totals are kept against the budget.',
+  lead:'Every cost for the trip, with its invoice or receipt attached. Totals add up as you go.',
   blocks:[
    {type:'expenses', title:'Expenses'},
-   {type:'checks', title:'Done', items:['Every expense has its invoice or receipt attached','Work costs on the OPEX card, personal costs kept separate','Anything paid on a personal card sent for reimbursement','Expenses downloaded and sent to accounts after the trip']}
+   {type:'checks', title:'Done', items:['Every expense has its invoice or receipt attached','Work costs on the OPEX card, personal costs kept separate','Anything paid on a personal card sent for reimbursement','Expenses downloaded and sent to accounts after the trip','Expense report shared with accounts']}
  ]},
  {id:'people', title:'Coordinate people', when:'3 working days before',
   lead:'Everyone he’s meeting knows the plan before he lands. Stay in touch with David, or whoever he’s with, the whole way.',
@@ -18342,7 +18342,7 @@ function budgetInner(){
 }
 // Expenses: one row per cost, with invoices attached in Google Drive
 const EXP_CATS=['Flights','Hotel','Ground transport','Meals','Event or venue','Visa and insurance','Phone and data','Other'];
-const EXP_PAID=['OPEX card','Personal card','Cash','Invoice to pay'];
+const EXP_PAID=['OPEX card','AMEX card','Personal card','Cash','Invoice to pay'];
 const EXP_STATUS=['Paid','To pay','To reimburse','Reimbursed'];
 const expNum=v=>{const n=parseFloat(String(v||'').replace(/[^0-9.\-]/g,'')); return isFinite(n)?n:0};
 const money=(n,c)=>`${c} ${n.toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
@@ -18355,7 +18355,7 @@ function expSummaryHTML(){
     return `<div class="exp-sum"><div class="exp-total"><span>Spent</span><b>${money(v.total,c)}</b>${bud?`<span class="${v.total>bud?'ov-todo':'status'}">of ${money(bud,c)} budget${v.total>bud?' · over by '+money(v.total-bud,c):' · '+money(bud-v.total,c)+' left'}</span>`:''}</div>
       <div class="exp-cats">${Object.entries(v.cats).sort((a,b)=>b[1]-a[1]).map(([k,n])=>`<span>${esc(k)} <b>${money(n,c)}</b></span>`).join('')}</div>
       ${v.owed||v.toPay?`<div class="exp-cats">${v.toPay?`<span class="ov-todo">Still to pay <b>${money(v.toPay,c)}</b></span>`:''}${v.owed?`<span class="ov-todo">To reimburse <b>${money(v.owed,c)}</b></span>`:''}</div>`:''}</div>`}).join('')
-    +`<p class="${noInv?'ov-todo':'ov-ok'}" style="margin:.4rem 0 0">${noInv?`${noInv} expense${noInv>1?'s':''} without an invoice yet`:'Every expense has an invoice attached'}</p>`;
+    +`<p class="${noInv?'ov-todo':'ov-ok'}" style="margin:.4rem 0 0">${noInv?`${noInv} expense${noInv>1?'s':''} without an invoice or receipt yet`:'Every expense has an invoice or receipt attached'}</p>`;
 }
 function expensesHTML(){
   const ex=expensesList(), people=travellerNames(), opt=(list,v)=>(v&&!list.includes(v)?[v,...list]:list).map(o=>`<option ${o===v?'selected':''}>${esc(o)}</option>`).join('');
@@ -18370,26 +18370,68 @@ function expensesHTML(){
         <label class="f">Paid with<select data-exp="${i}|paid">${opt(EXP_PAID,e.paid||'OPEX card')}</select></label>
         <label class="f">Status<select data-exp="${i}|status">${opt(EXP_STATUS,e.status||'Paid')}</select></label>
       </div>
-      <div class="exp-inv">${files?`<div class="lf-list">${files}</div>`:'<span class="exp-noinv">No invoice yet. Paste a screenshot here, or</span>'}
-        <div class="row lc-acts"><button type="button" class="btn quiet" data-expattach="${i}">Attach invoice</button><button type="button" class="btn quiet" data-explink="${i}">Add link</button><button type="button" class="btn quiet exp-del" data-expdel="${i}">Remove expense</button></div></div>
+      <div class="exp-inv">${files?`<div class="lf-list">${files}</div>`:'<span class="exp-noinv">No invoice or receipt yet. Paste a screenshot here, or</span>'}
+        <div class="row lc-acts"><button type="button" class="btn quiet" data-expattach="${i}">Attach invoice or receipt</button><button type="button" class="btn quiet" data-explink="${i}">Add link</button><button type="button" class="btn quiet exp-del" data-expdel="${i}">Remove expense</button></div></div>
     </div>`}).join('');
-  return `<div id="expSum">${expSummaryHTML()}</div><div class="expcards">${rows}</div>
+  return `<div id="expSum">${expSummaryHTML()}</div><div id="expDoc">${expDocHTML()}</div><div class="expcards">${rows}</div>
     <div class="row" style="margin-top:.75rem"><button type="button" class="btn add" data-expadd="1">Add expense</button>${ex.length?'<button type="button" class="btn quiet add" data-expcsv="1">Download CSV</button>':''}</div>`;
 }
 async function attachToExpense(e,files){
-  if(!GOOGLE_CLIENT_ID){alert('Google Drive isn’t connected to this site yet. Upload the invoice to Google Drive yourself, copy its link, and use “Add link”.');return}
-  if(!driveReady()){driveSignIn(files?()=>attachToExpense(e,files):()=>toast('Connected to Google Drive. Tap Attach invoice again'));return}
+  if(!GOOGLE_CLIENT_ID){alert('Google Drive isn’t connected to this site yet. Upload the invoice or receipt to Google Drive yourself, copy its link, and use “Add link”.');return}
+  if(!driveReady()){driveSignIn(files?()=>attachToExpense(e,files):()=>toast('Connected to Google Drive. Tap Attach invoice or receipt again'));return}
   const go=async list=>{const trip=cur; for(const file of list){toast(`Uploading ${file.name}…`);
-    try{const name=['Expense',e.date,e.desc||e.cat,file.name==='image.png'?'invoice.png':file.name].filter(Boolean).join(' - ');
-      const f=await driveSave(file,name,trip); (e.files=e.files||[]).push({name:file.name==='image.png'?'Invoice screenshot.png':file.name,url:f.webViewLink,id:f.id});
-      if(cur===trip){queueSave(); renderStep()} else persist(trip); toast(`${file.name==='image.png'?'Invoice':file.name} saved to Google Drive`)}
+    try{const name=['Expense',e.date,e.desc||e.cat,file.name==='image.png'?'receipt.png':file.name].filter(Boolean).join(' - ');
+      const f=await driveSave(file,name,trip); (e.files=e.files||[]).push({name:file.name==='image.png'?'Invoice or receipt.png':file.name,url:f.webViewLink,id:f.id});
+      if(cur===trip){queueSave(); renderStep()} else persist(trip); toast(`${file.name==='image.png'?'Screenshot':file.name} saved to Google Drive`); expDocSoon(trip)}
     catch(err){toast(`Couldn’t upload ${file.name}: ${err.message}`)}}};
   if(files)return go([...files]);
   const fi=document.createElement('input'); fi.type='file'; fi.multiple=true; fi.accept='image/*,application/pdf,.doc,.docx,.xls,.xlsx'; fi.onchange=()=>go([...fi.files]); fi.click();
 }
+// Expense report: a Google Doc in the trip's Drive folder, rebuilt from the list whenever it changes
+function expenseReportHTML(trip){
+  const ex=trip.t.expenses||[], e=esc, sums={};
+  ex.forEach(x=>{const c=x.cur||'AUD'; const s=sums[c]=sums[c]||{total:0,cats:{},owed:0,toPay:0}; const n=expNum(x.amount); s.total+=n; s.cats[x.cat||'Other']=(s.cats[x.cat||'Other']||0)+n; if(x.status==='To reimburse')s.owed+=n; if(x.status==='To pay')s.toPay+=n});
+  const f=trip.f||{}, dates=[f.dateOut,f.dateBack].filter(Boolean).join(' to ');
+  const hasBud=(trip.budget||[]).some(b=>b.for==='Whole trip'&&expNum(b.a));
+  const sumRows=Object.entries(sums).map(([c,s])=>{const bud=(trip.budget||[]).filter(b=>b.c===c&&b.for==='Whole trip').reduce((a,b)=>a+expNum(b.a),0);
+    return `<tr><td><b>${c}</b></td><td><b>${money(s.total,c)}</b></td>${hasBud?`<td>${bud?money(bud,c):''}</td><td>${bud?money(bud-s.total,c):''}</td>`:''}<td>${s.toPay?money(s.toPay,c):''}</td><td>${s.owed?money(s.owed,c):''}</td></tr>`}).join('');
+  const catRows=Object.entries(sums).flatMap(([c,s])=>Object.entries(s.cats).sort((a,b)=>b[1]-a[1]).map(([k,n])=>`<tr><td>${e(k)}</td><td>${money(n,c)}</td></tr>`)).join('');
+  const rows=ex.map(x=>`<tr><td>${e(x.date||'')}</td><td>${e(x.person||'Whole team')}</td><td>${e(x.cat||'Other')}</td><td>${e(x.desc||'')}</td><td>${e(x.paid||'OPEX card')}</td><td>${e(x.status||'Paid')}</td><td>${money(expNum(x.amount),x.cur||'AUD')}</td><td>${(x.files||[]).length?x.files.map(fl=>`<a href="${e(fl.url)}">${e(fl.name)}</a>`).join('<br>'):'<span style="color:#B4441A">Missing</span>'}</td></tr>`).join('');
+  const th=t=>`<th style="background:#EDF1EE;text-align:left">${t}</th>`;
+  return `<html><head><meta charset="utf-8"></head><body style="font-family:Arial,sans-serif">
+<h1>Expenses: ${e(tripName(trip))}</h1><p>${dates?e(dates)+' · ':''}${ex.length} expense${ex.length===1?'':'s'} · Updated ${e(new Date().toLocaleString('en-AU',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}))}</p>
+<h2>Totals</h2><table border="1" cellpadding="5" style="border-collapse:collapse"><tr>${['Currency','Spent',...(hasBud?['Budget','Left']:[]),'Still to pay','To reimburse'].map(th).join('')}</tr>${sumRows}</table>
+<h2>By category</h2><table border="1" cellpadding="5" style="border-collapse:collapse"><tr>${th('Category')}${th('Amount')}</tr>${catRows}</table>
+<h2>Every expense</h2><table border="1" cellpadding="5" style="border-collapse:collapse"><tr>${['Date','For','Category','What','Paid with','Status','Amount','Invoice or receipt'].map(th).join('')}</tr>${rows}</table>
+<p style="color:#5A6A6D">Made automatically by Trip Runbook. Changes made here will be replaced next time the expenses change; edit them in the runbook instead.</p></body></html>`;
+}
+const expDocTimers=new Map();
+function expDocSoon(trip){trip=trip||cur; if(!trip||!trip.expDoc||!driveReady())return; clearTimeout(expDocTimers.get(trip.id)); expDocTimers.set(trip.id,setTimeout(()=>syncExpenseDoc(trip,false),4000))}
+async function syncExpenseDoc(trip,loud){
+  if(!driveReady())return false; const html=new Blob([expenseReportHTML(trip)],{type:'text/html'});
+  try{
+    if(trip.expDoc&&trip.expDoc.id){
+      const r=await fetch(`https://www.googleapis.com/upload/drive/v3/files/${trip.expDoc.id}?uploadType=media&fields=id,webViewLink`,{method:'PATCH',headers:{Authorization:'Bearer '+gToken,'Content-Type':'text/html'},body:html});
+      if(r.status===401){gToken=null; throw new Error('Google sign-in expired')}
+      if(r.ok){trip.expDoc.updated=Date.now(); trip===cur?queueSave():persist(trip); refreshExpDoc(); if(loud)toast('Expense report updated'); return true}
+      // Couldn't replace it in place: make a fresh report and move the old one to the bin
+      if(r.status!==404)fetch(`https://www.googleapis.com/drive/v3/files/${trip.expDoc.id}`,{method:'PATCH',headers:{Authorization:'Bearer '+gToken,'Content-Type':'application/json'},body:JSON.stringify({trashed:true})}).catch(()=>{});
+    }
+    const root=await driveFolder('Trip runbook'), folder=await driveFolder(tripName(trip)||'Untitled trip',root);
+    const body=new FormData(); body.append('metadata',new Blob([JSON.stringify({name:'Expenses - '+(tripName(trip)||'Untitled trip'),mimeType:'application/vnd.google-apps.document',parents:[folder]})],{type:'application/json'})); body.append('file',html);
+    const made=await driveApi('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink',{method:'POST',body});
+    trip.expDoc={id:made.id,url:made.webViewLink,updated:Date.now()}; trip===cur?queueSave():persist(trip); refreshExpDoc(); if(loud)toast('Expense report created in Google Drive'); return true;
+  }catch(err){if(loud)toast('Couldn’t update the expense report: '+err.message); refreshExpDoc(); return false}
+}
+function expDocHTML(){
+  const d=cur.expDoc, ago=d&&d.updated?Math.round((Date.now()-d.updated)/60000):null;
+  if(!d)return `<div class="exp-doc"><span>📄 <b>Expense report</b>: a Google Doc in the trip’s Drive folder listing every expense, with totals and invoice and receipt links. It keeps itself up to date.</span><button type="button" class="btn" data-expdoc="1">Create expense report</button></div>`;
+  return `<div class="exp-doc"><span>📄 <a href="${esc(d.url)}" target="_blank" rel="noopener"><b>Expense report</b></a> · ${driveReady()?'updates automatically':'updates when you’re signed in to Google'}${ago!==null?` · last updated ${ago<1?'just now':ago<60?ago+' min ago':new Date(d.updated).toLocaleString('en-AU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}`:''}</span><button type="button" class="btn quiet" data-expdoc="1">Update now</button></div>`;
+}
+function refreshExpDoc(){const el=document.getElementById('expDoc'); if(el&&cur)el.innerHTML=expDocHTML()}
 async function expensesCsv(){
   const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
-  const lines=[['Date','For','Category','What','Amount','Currency','Paid with','Status','Invoices'].map(q).join(',')]
+  const lines=[['Date','For','Category','What','Amount','Currency','Paid with','Status','Invoices and receipts'].map(q).join(',')]
     .concat(expensesList().map(e=>[e.date,e.person||'Whole team',e.cat||'Other',e.desc,expNum(e.amount).toFixed(2),e.cur||'AUD',e.paid||'OPEX card',e.status||'Paid',(e.files||[]).map(f=>f.url).join(' ')].map(q).join(',')));
   const name=('Expenses - '+tripName(cur)).replace(/[\\/:*?"<>|]+/g,'-')+'.csv', blob=new Blob(['\ufeff'+lines.join('\r\n')],{type:'text/csv'});
   if(downloads){try{await downloads.save({filename:name,data:blob})}catch(_){}} else{const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000)}
@@ -18443,7 +18485,7 @@ function afterDestChange(rest=''){
 function newTrip(){
   const id='t'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
   const leg=(what,where='')=>({day:'',local:'',syd:'',what,where,who:'',by:'',ref:'',status:'Gap'});
-  return {id,created:Date.now(),updated:Date.now(),step:0,sv:STEP_VERSION,
+  return {id,created:Date.now(),updated:Date.now(),step:0,sv:STEP_VERSION,cv:1,
     f:{kind:'Work',team:'No',china:'No'},c:{},
     t:{
       travellers:[{name:'Jaya Yoannidis',mobile:'',chat:'',email:'',flights:''}],
@@ -18780,7 +18822,10 @@ const STEP_ORDERS={1:['intake','research','legs','team','check','book','res','pe
   2:['intake','research','legs','check','book','res','people','emergency','brief','team','during','debrief'],
   3:['intake','research','check','legs','book','res','people','emergency','brief','team','during','debrief']};
 const STEP_VERSION=4;
-function migrateStep(t){if(!t||t.sv===STEP_VERSION)return t; const old=STEP_ORDERS[t.sv||1], id=old&&old[t.step], ni=STEPS.findIndex(s=>s.id===id); if(ni>=0)t.step=ni; t.sv=STEP_VERSION; return t}
+// Intake's "Budget limits or anything unusual" check was removed; move the tick on the item after it up one place
+function migrateChecks(t){if(!t||t.cv>=1||!t.c)return; const bi=STEPS[0].blocks.findIndex(b=>b.type==='checks'&&b.title==='Done'), k=`intake.${bi}.`;
+  if(bi>=0){if(t.c[k+'6'])t.c[k+'5']=true; else delete t.c[k+'5']; delete t.c[k+'6']} t.cv=1}
+function migrateStep(t){migrateChecks(t); if(!t||t.sv===STEP_VERSION)return t; const old=STEP_ORDERS[t.sv||1], id=old&&old[t.step], ni=STEPS.findIndex(s=>s.id===id); if(ni>=0)t.step=ni; t.sv=STEP_VERSION; return t}
 function visSteps(t=cur){return STEPS.map((_,i)=>i).filter(i=>shows(STEPS[i],t))}
 function fixStep(){const v=visSteps(); if(!v.includes(cur.step)){cur.step=v.filter(i=>i<cur.step).pop()??v[0]}}
 function personMatch(text,name){
@@ -19270,7 +19315,7 @@ document.addEventListener('input',e=>{
     const sel=el.parentElement.querySelector('select'); if(sel){[...sel.options].forEach(o=>{if(!LEG_TYPES.includes(o.value))o.remove()});
       if(row.what!=='Other')sel.prepend(new Option(row.what,row.what,true,true)); sel.value=row.what}
     queueSave(); refreshDerived(); return}
-  if(el.dataset.exp!==undefined){const [i,k]=el.dataset.exp.split('|'); expensesList()[+i][k]=el.value; queueSave(); const sm=$('#expSum'); if(sm)sm.innerHTML=expSummaryHTML(); return}
+  if(el.dataset.exp!==undefined){const [i,k]=el.dataset.exp.split('|'); expensesList()[+i][k]=el.value; queueSave(); expDocSoon(); const sm=$('#expSum'); if(sm)sm.innerHTML=expSummaryHTML(); return}
   if(el.dataset.lx!==undefined){const [ri,i,k]=el.dataset.lx.split(':'); const x=cur.t.legs[+ri].extra[+i]; x[k]=el.value; queueSave(); return}
   if(el.dataset.t!==undefined){const row=cur.t[el.dataset.t][+el.dataset.r]; row[el.dataset.c]=el.value;
     if(el.dataset.t==='flights'&&el.dataset.c==='ref'&&el.value.trim()&&(row.status||'Gap')==='Gap'){row.status='Booked'; const ss=el.closest('tr,.legcard').querySelector('[data-c="status"]'); if(ss)ss.value='Booked'; el.closest('tr,.legcard').classList.remove('is-gap')}
@@ -19373,13 +19418,15 @@ document.addEventListener('click',async e=>{
   const le=e.target.closest('[data-legedit]'); if(le&&cur){cur.legView='detail'; cur.legP=le.dataset.legedit; queueSave(); renderStep(); return}
   if(e.target.closest('[data-expadd]')&&cur){const ex=expensesList(), last=ex[ex.length-1]; ex.push({date:new Date().toISOString().slice(0,10),cat:'Other',cur:last?last.cur:'AUD',person:'Whole team',paid:'OPEX card',status:'Paid',amount:'',desc:''}); queueSave(); renderStep();
     const d=document.querySelector(`[data-exp="${ex.length-1}|desc"]`); if(d){d.closest('.expcard').scrollIntoView({block:'center'}); d.focus()} return}
-  const xd=e.target.closest('[data-expdel]'); if(xd&&cur){const i=+xd.dataset.expdel, x=expensesList()[i]; if((x.desc||x.amount||(x.files||[]).length)&&!confirm(`Remove “${x.desc||'this expense'}”?${(x.files||[]).length?' Its invoices stay in Google Drive.':''}`))return; expensesList().splice(i,1); queueSave(); renderStep(); return}
+  const xd=e.target.closest('[data-expdel]'); if(xd&&cur){const i=+xd.dataset.expdel, x=expensesList()[i]; if((x.desc||x.amount||(x.files||[]).length)&&!confirm(`Remove “${x.desc||'this expense'}”?${(x.files||[]).length?' Its invoices stay in Google Drive.':''}`))return; expensesList().splice(i,1); queueSave(); renderStep(); expDocSoon(); return}
   const xa=e.target.closest('[data-expattach]'); if(xa&&cur){attachToExpense(expensesList()[+xa.dataset.expattach]); return}
-  const xl=e.target.closest('[data-explink]'); if(xl&&cur){const url=(prompt('Paste a link to the invoice (for example a Google Drive link)')||'').trim(); if(!url)return;
+  const xl=e.target.closest('[data-explink]'); if(xl&&cur){const url=(prompt('Paste a link to the invoice or receipt (for example a Google Drive link)')||'').trim(); if(!url)return;
     if(!/^https?:\/\//i.test(url)){toast('That doesn’t look like a link');return}
-    const name=(prompt('What should this link be called?','Invoice')||'').trim()||'Invoice'; const x=expensesList()[+xl.dataset.explink]; (x.files=x.files||[]).push({name,url}); queueSave(); renderStep(); return}
-  const xf=e.target.closest('[data-expfdel]'); if(xf&&cur){const [i,j]=xf.dataset.expfdel.split(':'); const x=expensesList()[+i]; if(!confirm(`Remove “${x.files[+j].name}”? The file stays in Google Drive.`))return; x.files.splice(+j,1); queueSave(); renderStep(); return}
+    const name=(prompt('What should this link be called?','Invoice')||'').trim()||'Receipt'; const x=expensesList()[+xl.dataset.explink]; (x.files=x.files||[]).push({name,url}); queueSave(); renderStep(); expDocSoon(); return}
+  const xf=e.target.closest('[data-expfdel]'); if(xf&&cur){const [i,j]=xf.dataset.expfdel.split(':'); const x=expensesList()[+i]; if(!confirm(`Remove “${x.files[+j].name}”? The file stays in Google Drive.`))return; x.files.splice(+j,1); queueSave(); renderStep(); expDocSoon(); return}
   if(e.target.closest('[data-expcsv]')&&cur){expensesCsv(); return}
+  if(e.target.closest('[data-expdoc]')&&cur){if(!GOOGLE_CLIENT_ID){toast('Google Drive isn’t connected to this site');return} const trip=cur;
+    if(!driveReady()){driveSignIn(()=>syncExpenseDoc(trip,true)); return} syncExpenseDoc(trip,true); return}
   if(e.target.closest('[data-consfill]')&&cur){if(cur.f.consulate&&cur.f.consulate!==cur.f.consulateAuto&&!confirm('Replace what’s in the embassy box with the details for the destinations?'))return; autoConsulate(true); return}
   if(e.target.closest('[data-yespick]')&&cur){const fi=document.createElement('input'); fi.type='file'; fi.accept='image/*,application/pdf'; fi.multiple=true; fi.onchange=()=>uploadYes(fi.files);
     if(GOOGLE_CLIENT_ID&&!driveReady()){driveSignIn(()=>toast('Connected to Google Drive. Tap “choose an image” again')); return} fi.click(); return}
