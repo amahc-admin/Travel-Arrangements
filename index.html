@@ -136,6 +136,7 @@ ul.countries{margin:.25rem 0 0;padding-left:1.1rem}
 }
 input[type=text],input[type=date],input[type=time],input[type=url],select,textarea{width:100%;padding:.5rem .6rem;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font-size:.95rem}
 textarea{min-height:4.5rem;resize:vertical}
+textarea[data-f="consulate"]{min-height:13rem}
 
 ul.checks{list-style:none;margin:0;padding:0}
 ul.checks li+li{border-top:1px solid var(--line)}
@@ -249,6 +250,24 @@ table.ed td.nm{font-weight:600;vertical-align:middle;padding-left:.4rem;color:va
 .legcard.dragging .lc-grip b{color:var(--accent-ink)}
 body.noselect{user-select:none;-webkit-user-select:none;cursor:grabbing}
 .lc-other{margin-top:.4rem}
+.expcards{display:flex;flex-direction:column;gap:.85rem;margin-top:1rem}
+.expcard{border:1px solid var(--line);border-radius:10px;padding:.9rem 1rem;background:var(--bg)}
+.expcard.no-inv{border-left:4px solid var(--gap)}
+.expcard:focus-within{border-color:var(--accent)}
+.exp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(11rem,1fr));gap:.75rem}
+.exp-wide{grid-column:span 2}
+.exp-amt{display:grid;grid-template-columns:5.5rem minmax(0,1fr);gap:.35rem}
+.exp-inv{margin-top:.75rem;padding-top:.6rem;border-top:1px dashed var(--line);display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .5rem}
+.exp-inv .lf-list{margin:0}
+.exp-noinv{color:var(--gap);font-size:.88rem}
+.exp-del{margin-left:auto}
+.lc-acts .btn.exp-del{color:var(--muted)}
+.exp-sum{padding:.75rem 1rem;border:1px solid var(--line);border-radius:10px;background:var(--bg);margin-bottom:.5rem}
+.exp-total{display:flex;flex-wrap:wrap;align-items:baseline;gap:.25rem .75rem}
+.exp-total b{font-size:1.35rem}
+.exp-cats{display:flex;flex-wrap:wrap;gap:.25rem 1.1rem;margin-top:.35rem;font-size:.9rem;color:var(--muted)}
+.exp-cats b{color:var(--ink);font-weight:600}
+@media (max-width:600px){.exp-wide{grid-column:1/-1}.exp-grid{grid-template-columns:1fr 1fr}}
 .pastezone{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .5rem;padding:.85rem 1rem;border:2px dashed var(--line);border-radius:8px;color:var(--muted);font-size:.92rem;background:var(--bg);cursor:text}
 .pastezone:focus,.pastezone.over{border-color:var(--accent);color:var(--ink);outline:none}
 .pastezone .btn{color:var(--accent);padding:.25rem .5rem}
@@ -454,6 +473,12 @@ const STEPS = [
      'Every reservation in the calendar with address, ref and cancel-by date','Party size matches the traveller list',
      'Dietary needs sent to every restaurant and venue','Deposits paid on the right card, receipts filed',
      'Confirmations in the trip folder']}
+ ]},
+ {id:'expenses', title:'Expenses', when:'As money is spent',
+  lead:'Every cost for the trip, with its invoice or receipt attached. Totals are kept against the budget.',
+  blocks:[
+   {type:'expenses', title:'Expenses'},
+   {type:'checks', title:'Done', items:['Every expense has its invoice or receipt attached','Work costs on the OPEX card, personal costs kept separate','Anything paid on a personal card sent for reimbursement','Expenses downloaded and sent to accounts after the trip']}
  ]},
  {id:'people', title:'Coordinate people', when:'3 working days before',
   lead:'Everyone he’s meeting knows the plan before he lands. Stay in touch with David, or whoever he’s with, the whole way.',
@@ -18315,6 +18340,65 @@ function budgetInner(){
   if(!cur.budget||!cur.budget.length)cur.budget=[{c:'AUD',a:'',for:'Whole trip'}];
   return cur.budget.map((b,i)=>`<div class="brow"><select data-bud="${i}|c" aria-label="Currency, line ${i+1}">${CURRENCIES.map(c=>`<option ${c===b.c?'selected':''}>${c}</option>`).join('')}</select><input type="text" inputmode="decimal" data-bud="${i}|a" value="${esc(b.a||'')}" placeholder="Amount" aria-label="Amount, line ${i+1}"><select data-bud="${i}|for" aria-label="Applies to, line ${i+1}">${BUDGET_FOR.map(o=>`<option ${o===b.for?'selected':''}>${o}</option>`).join('')}</select><button type="button" class="del" data-buddel="${i}" aria-label="Remove budget line ${i+1}">×</button></div>`).join('')+`<button type="button" class="btn add" data-budadd="1">Add budget line</button>`;
 }
+// Expenses: one row per cost, with invoices attached in Google Drive
+const EXP_CATS=['Flights','Hotel','Ground transport','Meals','Event or venue','Visa and insurance','Phone and data','Other'];
+const EXP_PAID=['OPEX card','Personal card','Cash','Invoice to pay'];
+const EXP_STATUS=['Paid','To pay','To reimburse','Reimbursed'];
+const expNum=v=>{const n=parseFloat(String(v||'').replace(/[^0-9.\-]/g,'')); return isFinite(n)?n:0};
+const money=(n,c)=>`${c} ${n.toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+function expensesList(){return cur.t.expenses||(cur.t.expenses=[])}
+function expSummaryHTML(){
+  const ex=expensesList(); if(!ex.length)return '<p class="status">No expenses yet. Add the first one below.</p>';
+  const by={}; ex.forEach(e=>{const c=e.cur||'AUD'; (by[c]=by[c]||{total:0,cats:{},owed:0,toPay:0}); const n=expNum(e.amount); by[c].total+=n; by[c].cats[e.cat||'Other']=(by[c].cats[e.cat||'Other']||0)+n; if(e.status==='To reimburse')by[c].owed+=n; if(e.status==='To pay')by[c].toPay+=n});
+  const noInv=ex.filter(e=>!(e.files||[]).length).length;
+  return Object.entries(by).map(([c,v])=>{const bud=(cur.budget||[]).filter(b=>b.c===c&&b.for==='Whole trip').reduce((a,b)=>a+expNum(b.a),0);
+    return `<div class="exp-sum"><div class="exp-total"><span>Spent</span><b>${money(v.total,c)}</b>${bud?`<span class="${v.total>bud?'ov-todo':'status'}">of ${money(bud,c)} budget${v.total>bud?' · over by '+money(v.total-bud,c):' · '+money(bud-v.total,c)+' left'}</span>`:''}</div>
+      <div class="exp-cats">${Object.entries(v.cats).sort((a,b)=>b[1]-a[1]).map(([k,n])=>`<span>${esc(k)} <b>${money(n,c)}</b></span>`).join('')}</div>
+      ${v.owed||v.toPay?`<div class="exp-cats">${v.toPay?`<span class="ov-todo">Still to pay <b>${money(v.toPay,c)}</b></span>`:''}${v.owed?`<span class="ov-todo">To reimburse <b>${money(v.owed,c)}</b></span>`:''}</div>`:''}</div>`}).join('')
+    +`<p class="${noInv?'ov-todo':'ov-ok'}" style="margin:.4rem 0 0">${noInv?`${noInv} expense${noInv>1?'s':''} without an invoice yet`:'Every expense has an invoice attached'}</p>`;
+}
+function expensesHTML(){
+  const ex=expensesList(), people=travellerNames(), opt=(list,v)=>(v&&!list.includes(v)?[v,...list]:list).map(o=>`<option ${o===v?'selected':''}>${esc(o)}</option>`).join('');
+  const rows=ex.map((e,i)=>{const files=(e.files||[]).map((f,j)=>`<span class="lf-chip"><a href="${esc(f.url)}" target="_blank" rel="noopener" title="${esc(f.name)}">${esc(f.name)}</a><button class="del" data-expfdel="${i}:${j}" aria-label="Remove ${esc(f.name)}">×</button></span>`).join('');
+    return `<div class="expcard ${(e.files||[]).length?'':'no-inv'}" data-expi="${i}" tabindex="-1">
+      <div class="exp-grid">
+        <label class="f">Date<input type="date" data-exp="${i}|date" value="${esc(e.date||'')}"></label>
+        <label class="f">Category<select data-exp="${i}|cat">${opt(EXP_CATS,e.cat||'Other')}</select></label>
+        <label class="f exp-wide">What and who it was paid to<input type="text" data-exp="${i}|desc" value="${esc(e.desc||'')}" placeholder="e.g. Qantas, flights for Thomas and Luca"></label>
+        <label class="f">Amount<div class="exp-amt"><select data-exp="${i}|cur" aria-label="Currency">${opt(CURRENCIES,e.cur||'AUD')}</select><input type="text" inputmode="decimal" data-exp="${i}|amount" value="${esc(e.amount||'')}" placeholder="0.00" aria-label="Amount"></div></label>
+        <label class="f">For<select data-exp="${i}|person">${opt(['Whole team',...people],e.person||'Whole team')}</select></label>
+        <label class="f">Paid with<select data-exp="${i}|paid">${opt(EXP_PAID,e.paid||'OPEX card')}</select></label>
+        <label class="f">Status<select data-exp="${i}|status">${opt(EXP_STATUS,e.status||'Paid')}</select></label>
+      </div>
+      <div class="exp-inv">${files?`<div class="lf-list">${files}</div>`:'<span class="exp-noinv">No invoice yet. Paste a screenshot here, or</span>'}
+        <div class="row lc-acts"><button type="button" class="btn quiet" data-expattach="${i}">Attach invoice</button><button type="button" class="btn quiet" data-explink="${i}">Add link</button><button type="button" class="btn quiet exp-del" data-expdel="${i}">Remove expense</button></div></div>
+    </div>`}).join('');
+  return `<div id="expSum">${expSummaryHTML()}</div><div class="expcards">${rows}</div>
+    <div class="row" style="margin-top:.75rem"><button type="button" class="btn add" data-expadd="1">Add expense</button>${ex.length?'<button type="button" class="btn quiet add" data-expcsv="1">Download CSV</button>':''}</div>`;
+}
+async function attachToExpense(e,files){
+  if(!GOOGLE_CLIENT_ID){alert('Google Drive isn’t connected to this site yet. Upload the invoice to Google Drive yourself, copy its link, and use “Add link”.');return}
+  if(!driveReady()){driveSignIn(files?()=>attachToExpense(e,files):()=>toast('Connected to Google Drive. Tap Attach invoice again'));return}
+  const go=async list=>{const trip=cur; for(const file of list){toast(`Uploading ${file.name}…`);
+    try{const name=['Expense',e.date,e.desc||e.cat,file.name==='image.png'?'invoice.png':file.name].filter(Boolean).join(' - ');
+      const f=await driveSave(file,name,trip); (e.files=e.files||[]).push({name:file.name==='image.png'?'Invoice screenshot.png':file.name,url:f.webViewLink,id:f.id});
+      if(cur===trip){queueSave(); renderStep()} else persist(trip); toast(`${file.name==='image.png'?'Invoice':file.name} saved to Google Drive`)}
+    catch(err){toast(`Couldn’t upload ${file.name}: ${err.message}`)}}};
+  if(files)return go([...files]);
+  const fi=document.createElement('input'); fi.type='file'; fi.multiple=true; fi.accept='image/*,application/pdf,.doc,.docx,.xls,.xlsx'; fi.onchange=()=>go([...fi.files]); fi.click();
+}
+async function expensesCsv(){
+  const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
+  const lines=[['Date','For','Category','What','Amount','Currency','Paid with','Status','Invoices'].map(q).join(',')]
+    .concat(expensesList().map(e=>[e.date,e.person||'Whole team',e.cat||'Other',e.desc,expNum(e.amount).toFixed(2),e.cur||'AUD',e.paid||'OPEX card',e.status||'Paid',(e.files||[]).map(f=>f.url).join(' ')].map(q).join(',')));
+  const name=('Expenses - '+tripName(cur)).replace(/[\\/:*?"<>|]+/g,'-')+'.csv', blob=new Blob(['\ufeff'+lines.join('\r\n')],{type:'text/csv'});
+  if(downloads){try{await downloads.save({filename:name,data:blob})}catch(_){}} else{const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000)}
+}
+document.addEventListener('paste',e=>{
+  const card=cur&&e.target.closest&&e.target.closest('.expcard'); if(!card)return;
+  const files=[...(e.clipboardData&&e.clipboardData.files||[])].filter(f=>/^image\/|pdf$/.test(f.type)); if(!files.length)return;
+  e.preventDefault(); attachToExpense(expensesList()[+card.dataset.expi],files);
+});
 function budgetHTML(fd){return `<div class="f wide"><span>${esc(fd.label)}</span><div id="budgetBlock">${budgetInner()}</div></div>`}
 function refreshBudget(){const b=$('#budgetBlock'); if(b)b.innerHTML=budgetInner()}
 let cityHi=0, cityMatches=[];
@@ -18437,10 +18521,100 @@ async function cityPoint(name){
       return g?{lat:g.coordinates[1],lon:g.coordinates[0],cc:(pp.countrycode||'').toUpperCase(),country:pp.country||'',name:pp.name||name}:null}).catch(()=>null);
   cityPoints.set(key,pr); return pr;
 }
-// Australian missions, from official DFAT and mission websites (checked Nov 2026). lat/lon only pick the nearest one.
-const AU_MISSIONS=[/*MISSIONS*/];
-const SMARTRAVELLER={/*SMARTRAVELLER*/};
-const AU_CEC=/*CEC*/'';
+// Australian missions, from the missions' official websites (checked Nov 2026). lat/lon are approximate and only pick the nearest one.
+const AU_MISSIONS=[
+{"cc": "CN", "name": "Australian Embassy, Beijing", "address": "21 Dongzhimenwai Street, Chaoyang District, Beijing 100600", "phone": "+86 10 5140 4111", "lat": 39.9405, "lon": 116.446},
+{"cc": "CN", "name": "Australian Consulate-General, Shanghai", "address": "Level 22, CITIC Square, 1168 Nanjing Xi Lu (Nanjing West Road), Shanghai 200041", "phone": "+86 21 2215 5200", "lat": 31.2296, "lon": 121.4529},
+{"cc": "CN", "name": "Australian Consulate-General, Guangzhou", "address": "12/F, Development Centre, No. 3 Linjiang Road, Zhujiang New City, Guangzhou 510623, Guangdong", "phone": "+86 20 3814 0111", "lat": 23.1168, "lon": 113.327},
+{"cc": "CN", "name": "Australian Consulate-General, Chengdu", "address": "Level 27, Square One, 18 Dongyu St, Jinjiang District, Chengdu 610016, Sichuan", "phone": "+86 28 6268 5200", "lat": 30.6565, "lon": 104.083},
+{"cc": "HK", "name": "Australian Consulate-General, Hong Kong", "address": "23/F Harbour Centre, 25 Harbour Road, Wanchai, Hong Kong SAR (also covers Macau)", "phone": "+852 2827 8881", "lat": 22.281, "lon": 114.1735},
+{"cc": "TW", "name": "Australian Office, Taipei", "address": "The President International Tower, 27-28th Floors, No. 9-11 Songgao Rd, Taipei 11073", "phone": "+886 2 8725 4100", "lat": 25.039, "lon": 121.568},
+{"cc": "JP", "name": "Australian Embassy, Tokyo", "address": "2-1-14 Mita, Minato-ku, Tokyo 108-8361", "phone": "+81 3 5232 4111", "lat": 35.648, "lon": 139.742},
+{"cc": "JP", "name": "Australian Consulate-General, Osaka", "address": "16F Twin 21 MID Tower, 2-1-61 Shiromi, Chuo-ku, Osaka 540-6116", "phone": "+81 6 6941 9271", "lat": 34.6925, "lon": 135.53},
+{"cc": "KR", "name": "Australian Embassy, Seoul", "address": "19th Fl, Kyobo Building, 1 Jongro, Jongno-Gu, Seoul 03154", "phone": "+82 2 2003 0100", "lat": 37.5705, "lon": 126.978},
+{"cc": "MN", "name": "Australian Embassy, Ulaanbaatar", "address": "Level 20, Shangri-La Centre, 19A Olympic Street, Sukhbaatar District-1, Ulaanbaatar 14241, Mongolia", "phone": "+976 7013 3001", "lat": 47.9135, "lon": 106.9195},
+{"cc": "US", "name": "Australian Embassy, Washington DC", "address": "1601 Massachusetts Ave NW, Washington, DC 20036", "phone": "+1 202 797 3000", "lat": 38.9089, "lon": -77.039},
+{"cc": "US", "name": "Australian Consulate-General, New York", "address": "150 East 42nd Street, 34th Floor, New York, NY 10017", "phone": "+1 212 351 6500", "lat": 40.7508, "lon": -73.9754},
+{"cc": "US", "name": "Australian Consulate-General, Los Angeles", "address": "2029 Century Park East, Suite 3150, Los Angeles, CA 90067", "phone": "+1 310 229 2300", "lat": 34.0575, "lon": -118.4148},
+{"cc": "US", "name": "Australian Consulate-General, San Francisco", "address": "575 Market Street, Suite 1800, San Francisco, CA 94105", "phone": "+1 415 644 3620", "lat": 37.7897, "lon": -122.4005},
+{"cc": "US", "name": "Australian Consulate-General, Chicago", "address": "123 North Wacker Drive, Suite 1330, Chicago, IL 60606", "phone": "+1 312 419 1480", "lat": 41.8838, "lon": -87.6372},
+{"cc": "US", "name": "Australian Consulate-General, Honolulu", "address": "Penthouse, 1000 Bishop St, Honolulu, HI 96813", "phone": "+1 808 529 8100", "lat": 21.3095, "lon": -157.8613},
+{"cc": "US", "name": "Australian Consulate-General, Houston", "address": "3009 Post Oak Blvd, Suite 1310, Houston, TX 77056", "phone": "+1 832 962 8420", "lat": 29.7405, "lon": -95.4612},
+{"cc": "CA", "name": "Australian High Commission, Ottawa", "address": "Suite 1301 - 50 O'Connor Street, Ottawa, Ontario, K1P 6L2", "phone": "+1 613 236 0841", "lat": 45.4222, "lon": -75.6983},
+{"cc": "CA", "name": "Australian Consulate-General, Toronto", "address": "175 Bloor Street East, Suite 1100 - South Tower, Toronto, Ontario M4W 3R8", "phone": "+1 416 323 4280", "lat": 43.6712, "lon": -79.3837},
+{"cc": "CA", "name": "Australian Consulate, Vancouver", "address": "Suite 2050 - 1075 West Georgia Street, Vancouver, British Columbia V6E 3C9", "phone": "+1 604 694 6160", "lat": 49.2862, "lon": -123.1213},
+{"cc": "MX", "name": "Australian Embassy, Mexico City", "address": "Rubén Darío 55, Col. Bosque de Chapultepec, C.P. 11580, Mexico City", "phone": "+52 55 1101 2200", "lat": 19.427, "lon": -99.189},
+{"cc": "BR", "name": "Australian Embassy, Brasília", "address": "SES Quadra 801, Conjunto K, Lote 7, Brasília-DF, CEP 70200-010", "phone": "+55 61 3226 3111", "lat": -15.8, "lon": -47.896},
+{"cc": "BR", "name": "Australian Consulate-General, São Paulo", "address": "Alameda Santos 700, Ed. Trianon Corporate, 9th Floor, Conj. 92, Cerqueira César, São Paulo - SP, 01418-100", "phone": "+55 11 2112 6200", "lat": -23.566, "lon": -46.652},
+{"cc": "AR", "name": "Australian Embassy, Buenos Aires", "address": "Villanueva 1400, (C1426BMJ), CABA, Argentina", "phone": "+54 11 4779 3500", "lat": -34.568, "lon": -58.438},
+{"cc": "CL", "name": "Australian Embassy, Santiago", "address": "Av. Isidora Goyenechea 3621, Torre B, 13th Floor, Las Condes, Santiago", "phone": "+56 2 2550 3500", "lat": -33.413, "lon": -70.6},
+{"cc": "PE", "name": "Australian Embassy, Lima", "address": "Av. La Paz 1049, 10th Floor, Miraflores, Lima 15074", "phone": "+51 1 630 0500", "lat": -12.124, "lon": -77.028},
+{"cc": "CO", "name": "Australian Embassy, Bogotá", "address": "Edificio Tierra Firme, Avenida Carrera 9 No. 115-06, Oficina 2003, Bogotá", "phone": "+57 601 657 8030", "lat": 4.695, "lon": -74.032},
+{"cc": "GB", "name": "Australian High Commission, London", "address": "Australia House, Strand, London WC2B 4LA", "phone": "+44 20 7379 4334", "lat": 51.5126, "lon": -0.1167},
+{"cc": "IE", "name": "Australian Embassy, Dublin", "address": "3rd Floor, 47/49 St Stephen's Green, Dublin 2", "phone": "+353 1 664 5300", "lat": 53.338, "lon": -6.257},
+{"cc": "FR", "name": "Australian Embassy, Paris", "address": "4 rue Jean Rey, 75724 Paris Cedex 15", "phone": "+33 1 40 59 33 00", "lat": 48.856, "lon": 2.29},
+{"cc": "DE", "name": "Australian Embassy, Berlin", "address": "Wallstraße 76-79, 10179 Berlin", "phone": "+49 30 880088 0", "lat": 52.5122, "lon": 13.413},
+{"cc": "DE", "name": "Australian Consulate-General, Frankfurt", "address": "Main Tower, 28th Floor, Neue Mainzer Str. 52-58, 60311 Frankfurt", "phone": "+49 69 90558 0", "lat": 50.1125, "lon": 8.672},
+{"cc": "IT", "name": "Australian Embassy, Rome", "address": "Via Antonio Bosio 5, 00161 Rome", "phone": "+39 06 852721", "lat": 41.913, "lon": 12.517},
+{"cc": "IT", "name": "Australian Consulate-General, Milan", "address": "Via Borgogna 2 (third floor), 20122 Milan", "phone": "+39 02 7767 4200", "lat": 45.465, "lon": 9.201},
+{"cc": "ES", "name": "Australian Embassy, Madrid", "address": "Paseo de la Castellana 259D, Torre Emperador - Planta 24, 28046 Madrid", "phone": "+34 91 353 6600", "lat": 40.478, "lon": -3.687},
+{"cc": "NL", "name": "Australian Embassy, The Hague", "address": "Carnegielaan 4, 2517 KH The Hague", "phone": "+31 70 310 8200", "lat": 52.087, "lon": 4.295},
+{"cc": "BE", "name": "Australian Embassy, Brussels", "address": "Avenue des Arts / Kunstlaan 56, 1000 Brussels", "phone": "+32 2 286 0500", "lat": 50.84, "lon": 4.368},
+{"cc": "CH", "name": "Australian Consulate-General, Geneva", "address": "Chemin des Fins 2, CP 115, 1218 Le Grand-Saconnex", "phone": "+41 22 799 9100", "lat": 46.228, "lon": 6.124},
+{"cc": "AT", "name": "Australian Embassy, Vienna", "address": "The Icon, Gertrude-Froehlich-Sandner-Str. 2, 1100 Vienna", "phone": "+43 1 506 740", "lat": 48.186, "lon": 16.377},
+{"cc": "GR", "name": "Australian Embassy, Athens", "address": "Level 2, 5 Hatziyianni Mexi Street, 11528 Athens", "phone": "+30 210 870 4000", "lat": 37.976, "lon": 23.748},
+{"cc": "PL", "name": "Australian Embassy, Warsaw", "address": "Rondo ONZ 1, Rondo 1 Building, 8th Floor, 00-124 Warsaw", "phone": "+48 22 521 3444", "lat": 52.233, "lon": 20.998},
+{"cc": "SE", "name": "Australian Embassy, Stockholm", "address": "Klarabergsviadukten 63, 8th Floor, Stockholm", "phone": "+46 8 613 2900", "lat": 59.332, "lon": 18.057},
+{"cc": "DK", "name": "Australian Embassy, Copenhagen", "address": "Dampfaergevej 26, 2nd floor, 2100 Copenhagen Ø", "phone": "+45 70 26 36 76", "lat": 55.705, "lon": 12.599},
+{"cc": "PT", "name": "Australian Embassy, Lisbon", "address": "Avenida da Liberdade 200, 2nd Floor, 1250-147 Lisbon", "phone": "+351 21 310 1500", "lat": 38.721, "lon": -9.146},
+{"cc": "NZ", "name": "Australian High Commission, Wellington", "address": "72-76 Hobson Street, Thorndon, Wellington 6011", "phone": "+64 4 473 6411", "lat": -41.274, "lon": 174.78},
+{"cc": "NZ", "name": "Australian Consulate-General, Auckland", "address": "Level 7, HSBC Tower, 188 Quay Street, Auckland 1010", "phone": "+64 9 921 8800", "lat": -36.844, "lon": 174.768},
+{"cc": "FJ", "name": "Australian High Commission, Suva", "address": "37 Princes Road, Tamavua, Suva", "phone": "+679 338 2211", "lat": -18.12, "lon": 178.44},
+{"cc": "PG", "name": "Australian High Commission, Port Moresby", "address": "Godwit Road, Waigani NCD, Port Moresby", "phone": "+675 7090 0100", "lat": -9.425, "lon": 147.182},
+{"cc": "PG", "name": "Australian Consulate-General, Lae", "address": "Level 4, Nambawan Supa Haus, 2nd Street, Top Town, Lae, Morobe Province", "phone": "+675 7999 5300", "lat": -6.733, "lon": 146.997},
+{"cc": "WS", "name": "Australian High Commission, Apia", "address": "Beach Rd, Apia", "phone": "+685 23411", "lat": -13.831, "lon": -171.762},
+{"cc": "VU", "name": "Australian High Commission, Port Vila", "address": "Winston Churchill Avenue, Port Vila", "phone": "+678 22777", "lat": -17.74, "lon": 168.313},
+{"cc": "SB", "name": "Australian High Commission, Honiara", "address": "Cnr Hibiscus Ave & Mud Alley, Honiara", "phone": "+677 21561", "lat": -9.431, "lon": 159.956},
+{"cc": "TO", "name": "Australian High Commission, Nuku'alofa", "address": "82 Salote Road, Nuku'alofa, Tongatapu", "phone": "+676 20400", "lat": -21.136, "lon": -175.2},
+{"cc": "NC", "name": "Australian Consulate-General, Nouméa", "address": "Norwich Building, 11 rue Georges Baudoux, Nouméa", "phone": "+687 27 24 14", "lat": -22.273, "lon": 166.446},
+{"cc": "ZA", "name": "Australian High Commission, Pretoria", "address": "292 Orient Street, Arcadia, Pretoria", "phone": "+27 12 423 6000", "lat": -25.748, "lon": 28.215},
+{"cc": "KE", "name": "Australian High Commission, Nairobi", "address": "Limuru Road, Rosslyn, Nairobi", "phone": "+254 20 427 7100", "lat": -1.229, "lon": 36.805},
+{"cc": "NG", "name": "Australian High Commission, Abuja", "address": "Visits by appointment only; see nigeria.embassy.gov.au for the current address", "phone": "+234 20 9460 6960", "lat": 9.0765, "lon": 7.4986},
+{"cc": "VN", "name": "Australian Embassy, Hanoi", "address": "8 Dao Tan Street, Giang Vo Ward, Hanoi City, Vietnam", "phone": "+84 24 3774 0100", "lat": 21.0326, "lon": 105.813},
+{"cc": "VN", "name": "Australian Consulate-General, Ho Chi Minh City", "address": "20th Floor, Vincom Center, 47 Ly Tu Trong Street, Sai Gon Ward, Ho Chi Minh City, Vietnam", "phone": "+84 28 3521 8100", "lat": 10.7782, "lon": 106.702},
+{"cc": "TH", "name": "Australian Embassy, Bangkok", "address": "181 Soi ArunMcKinnon, Wireless Road, Lumphini, Pathumwan, Bangkok 10330", "phone": "+66 2 344 6300", "lat": 13.727, "lon": 100.546},
+{"cc": "TH", "name": "Australian Consulate-General, Phuket", "address": "6th Floor, CCM Complex, 77/77 Chalermprakiat Rama 9 Road (Bypass Road), Phuket 83000, Thailand", "phone": "+66 76 317 700", "lat": 7.889, "lon": 98.382},
+{"cc": "MY", "name": "Australian High Commission, Kuala Lumpur", "address": "No. 6, Jalan Yap Kwan Seng, 50450 Kuala Lumpur, Malaysia", "phone": "+60 3 2146 5555", "lat": 3.162, "lon": 101.715},
+{"cc": "SG", "name": "Australian High Commission, Singapore", "address": "25 Napier Road, Singapore 258507", "phone": "+65 6836 4100", "lat": 1.307, "lon": 103.823},
+{"cc": "ID", "name": "Australian Embassy, Jakarta", "address": "Jalan Patra Kuningan Raya Kav. 1-4, Jakarta Selatan 12950", "phone": "+62 21 2550 5555", "lat": -6.23, "lon": 106.833},
+{"cc": "ID", "name": "Australian Consulate-General, Bali", "address": "Jalan Tantular, No. 32, Renon, Denpasar - Bali 80234", "phone": "+62 361 2000 100", "lat": -8.674, "lon": 115.233},
+{"cc": "ID", "name": "Australian Consulate-General, Surabaya", "address": "Level 3 ESA Sampoerna Center, Jl. Dokter.Ir. H. Soekarno No. 198, Klampis Ngasem, Sukolilo, Surabaya 60117", "phone": "+62 31 9920 3200", "lat": -7.291, "lon": 112.779},
+{"cc": "ID", "name": "Australian Consulate-General, Makassar", "address": "Wisma Kalla Lt. 7, Jalan Dr Sam Ratulangi No. 8, 90132 Makassar, South Sulawesi", "phone": "+62 411 366 4100", "lat": -5.144, "lon": 119.413},
+{"cc": "PH", "name": "Australian Embassy, Manila", "address": "RCBC Plaza, Tower 2, Level 23, 6819 Ayala Avenue, Makati City 1200, Philippines", "phone": "+63 2 7757 8100", "lat": 14.56, "lon": 121.017},
+{"cc": "KH", "name": "Australian Embassy, Phnom Penh", "address": "16B, National Assembly Street, Sangkat Tonle Bassac, Khan Chamkamon, Phnom Penh, Cambodia", "phone": "+855 23 266 500", "lat": 11.549, "lon": 104.933},
+{"cc": "LA", "name": "Australian Embassy, Vientiane", "address": "Km 4, Thadeua Road, Watnak, Vientiane, Lao PDR", "phone": "+856 21 353 800", "lat": 17.937, "lon": 102.629},
+{"cc": "MM", "name": "Australian Embassy, Yangon", "address": "Vantage Tower, 623 Pyay Road, Yangon, Myanmar", "phone": "+95 1 230 7410", "lat": 16.823, "lon": 96.131},
+{"cc": "BN", "name": "Australian High Commission, Bandar Seri Begawan", "address": "Level 6, Dar Takaful Tower IBB Utama, Jalan Pemancha, Bandar Seri Begawan BS8711, Brunei Darussalam", "phone": "+673 222 9435", "lat": 4.889, "lon": 114.942},
+{"cc": "TL", "name": "Australian Embassy, Dili", "address": "Rua Mártires da Patria, Dili, Timor-Leste", "phone": "+670 332 2111", "lat": -8.554, "lon": 125.564},
+{"cc": "IN", "name": "Australian High Commission, New Delhi", "address": "1/50 G, Shantipath, Chanakyapuri, New Delhi 110021", "phone": "+91 11 4139 9900", "lat": 28.597, "lon": 77.188},
+{"cc": "IN", "name": "Australian Consulate-General, Mumbai", "address": "Level 10, A Wing, Crescenzo Building, Opp MCA Cricket Club, G Block, Plot C 38-39, Bandra Kurla Complex, Mumbai 400 051", "phone": "+91 22 6757 4900", "lat": 19.066, "lon": 72.865},
+{"cc": "IN", "name": "Australian Consulate-General, Chennai", "address": "9th Floor, Express Chambers, Express Avenue, 49, 50L Whites Road, Royapettah, Chennai 600 014", "phone": "+91 44 4592 1300", "lat": 13.059, "lon": 80.264},
+{"cc": "IN", "name": "Australian Consulate-General, Kolkata", "address": "1A, Ho Chi Minh Sarani, Kolkata 700-071", "phone": "+91 11 4910 5980", "lat": 22.548, "lon": 88.352},
+{"cc": "IN", "name": "Australian Consulate-General, Bengaluru", "address": "Level 10, Global Tech Park - MFAR, 37, Cunningham Road, Vasanth Nagar, Bengaluru 560052", "phone": "+91 80 4505 5900", "lat": 12.988, "lon": 77.593},
+{"cc": "LK", "name": "Australian High Commission, Colombo", "address": "21 Srimath RG Senanayake Mawatha, Colombo 7", "phone": "+94 11 246 3200", "lat": 6.905, "lon": 79.855},
+{"cc": "BD", "name": "Australian High Commission, Dhaka", "address": "184 Gulshan Avenue, Gulshan 2, Dhaka 1212", "phone": "+880 9604 260100", "lat": 23.796, "lon": 90.415},
+{"cc": "PK", "name": "Australian High Commission, Islamabad", "address": "Constitution Ave and Ispahani Road, Diplomatic Enclave No. 1, Sector G-5/4, Islamabad", "phone": "+92 51 835 5500", "lat": 33.729, "lon": 73.105},
+{"cc": "NP", "name": "Australian Embassy, Kathmandu", "address": "Bansbari, Kathmandu", "phone": "+977 1 437 1678", "lat": 27.74, "lon": 85.336},
+{"cc": "AE", "name": "Australian Embassy, Abu Dhabi", "address": "Level 16, Nayel & Bin Harmal Tower, Zayed the First Street, Abu Dhabi", "phone": "+971 2 401 7500", "lat": 24.487, "lon": 54.361},
+{"cc": "AE", "name": "Australian Consulate-General, Dubai", "address": "Level 25 BurJuman Business Tower, Sheikh Khalifa Bin Zayed Road, Mankhool, Bur Dubai", "phone": "+971 4 508 7100", "lat": 25.254, "lon": 55.303},
+{"cc": "SA", "name": "Australian Embassy, Riyadh", "address": "Abdullah Al-Sahmi Street, Diplomatic Quarter, Riyadh 11693", "phone": "+966 11 250 0900", "lat": 24.683, "lon": 46.625},
+{"cc": "QA", "name": "Australian Embassy, Doha", "address": "Tornado Tower, Majlis Al Taawon St, Doha", "phone": "+974 4007 8500", "lat": 25.32, "lon": 51.529},
+{"cc": "TR", "name": "Australian Embassy, Ankara", "address": "MNG Building, Uğur Mumcu Caddesi No: 88, 7th Floor, Gaziosmanpaşa 06700, Ankara", "phone": "+90 312 459 9500", "lat": 39.902, "lon": 32.862},
+{"cc": "TR", "name": "Australian Consulate-General, Istanbul", "address": "Süzer Plaza, Asker Ocağı Cad. No: 15, Elmadağ Şişli 34367, Istanbul", "phone": "+90 212 393 3300", "lat": 41.045, "lon": 28.987},
+{"cc": "IL", "name": "Australian Embassy, Tel Aviv", "address": "Bank Discount Tower, 28th Floor, 23 Yehuda Halevi St., Tel Aviv 6513601", "phone": "+972 3 693 5000", "lat": 32.07, "lon": 34.794},
+{"cc": "EG", "name": "Australian Embassy, Cairo", "address": "11th Floor, World Trade Center, 1191 Corniche El-Nil, Boulak, Cairo", "phone": "+20 2 2770 6600", "lat": 30.07, "lon": 31.23}];
+const SMARTRAVELLER={"VN": "https://www.smartraveller.gov.au/destinations/asia/vietnam", "TH": "https://www.smartraveller.gov.au/destinations/asia/thailand", "MY": "https://www.smartraveller.gov.au/destinations/asia/malaysia", "SG": "https://www.smartraveller.gov.au/destinations/asia/singapore", "ID": "https://www.smartraveller.gov.au/destinations/asia/indonesia", "PH": "https://www.smartraveller.gov.au/destinations/asia/philippines", "KH": "https://www.smartraveller.gov.au/destinations/asia/cambodia", "LA": "https://www.smartraveller.gov.au/destinations/asia/laos", "MM": "https://www.smartraveller.gov.au/destinations/asia/myanmar", "BN": "https://www.smartraveller.gov.au/destinations/asia/brunei-darussalam", "TL": "https://www.smartraveller.gov.au/destinations/asia/timor-leste", "IN": "https://www.smartraveller.gov.au/destinations/asia/india", "LK": "https://www.smartraveller.gov.au/destinations/asia/sri-lanka", "BD": "https://www.smartraveller.gov.au/destinations/asia/bangladesh", "PK": "https://www.smartraveller.gov.au/destinations/asia/pakistan", "NP": "https://www.smartraveller.gov.au/destinations/asia/nepal", "AE": "https://www.smartraveller.gov.au/destinations/middle-east/united-arab-emirates", "SA": "https://www.smartraveller.gov.au/destinations/middle-east/saudi-arabia", "QA": "https://www.smartraveller.gov.au/destinations/middle-east/qatar", "TR": "https://www.smartraveller.gov.au/destinations/europe/turkiye", "IL": "https://www.smartraveller.gov.au/destinations/middle-east/israel-and-occupied-palestinian-territories", "EG": "https://www.smartraveller.gov.au/destinations/africa/egypt", "US": "https://www.smartraveller.gov.au/destinations/americas/united-states-america", "CA": "https://www.smartraveller.gov.au/destinations/americas/canada", "MX": "https://www.smartraveller.gov.au/destinations/americas/mexico", "BR": "https://www.smartraveller.gov.au/destinations/americas/brazil", "AR": "https://www.smartraveller.gov.au/destinations/americas/argentina", "CL": "https://www.smartraveller.gov.au/destinations/americas/chile", "PE": "https://www.smartraveller.gov.au/destinations/americas/peru", "CO": "https://www.smartraveller.gov.au/destinations/americas/colombia", "GB": "https://www.smartraveller.gov.au/destinations/europe/united-kingdom", "IE": "https://www.smartraveller.gov.au/destinations/europe/ireland", "FR": "https://www.smartraveller.gov.au/destinations/europe/france", "DE": "https://www.smartraveller.gov.au/destinations/europe/germany", "IT": "https://www.smartraveller.gov.au/destinations/europe/italy", "ES": "https://www.smartraveller.gov.au/destinations/europe/spain", "NL": "https://www.smartraveller.gov.au/destinations/europe/netherlands", "BE": "https://www.smartraveller.gov.au/destinations/europe/belgium", "CH": "https://www.smartraveller.gov.au/destinations/europe/switzerland", "AT": "https://www.smartraveller.gov.au/destinations/europe/austria", "GR": "https://www.smartraveller.gov.au/destinations/europe/greece", "PL": "https://www.smartraveller.gov.au/destinations/europe/poland", "SE": "https://www.smartraveller.gov.au/destinations/europe/sweden", "DK": "https://www.smartraveller.gov.au/destinations/europe/denmark", "PT": "https://www.smartraveller.gov.au/destinations/europe/portugal", "NZ": "https://www.smartraveller.gov.au/destinations/pacific/new-zealand", "FJ": "https://www.smartraveller.gov.au/destinations/pacific/fiji", "PG": "https://www.smartraveller.gov.au/destinations/pacific/papua-new-guinea", "WS": "https://www.smartraveller.gov.au/destinations/pacific/samoa", "VU": "https://www.smartraveller.gov.au/destinations/pacific/vanuatu", "SB": "https://www.smartraveller.gov.au/destinations/pacific/solomon-islands", "TO": "https://www.smartraveller.gov.au/destinations/pacific/tonga", "NC": "https://www.smartraveller.gov.au/destinations/pacific/new-caledonia", "ZA": "https://www.smartraveller.gov.au/destinations/africa/south-africa", "KE": "https://www.smartraveller.gov.au/destinations/africa/kenya", "NG": "https://www.smartraveller.gov.au/destinations/africa/nigeria", "CN": "https://www.smartraveller.gov.au/destinations/asia/china", "HK": "https://www.smartraveller.gov.au/destinations/asia/hong-kong", "MO": "https://www.smartraveller.gov.au/destinations/asia/macau", "TW": "https://www.smartraveller.gov.au/destinations/asia/taiwan", "JP": "https://www.smartraveller.gov.au/destinations/asia/japan", "KR": "https://www.smartraveller.gov.au/destinations/asia/south-korea-republic-korea", "MN": "https://www.smartraveller.gov.au/destinations/asia/mongolia"};
+const AU_CEC='24-hour Consular Emergency Centre (Australian Government): +61 2 6261 3305 from overseas, or 1300 555 135 within Australia';
 async function consulateText(){
   const dests=destList(); if(!dests.length)return null;
   const byMission=new Map(), missing=[];
@@ -18603,8 +18777,9 @@ function flightsBriefHTML(pname){
 function isTeam(t=cur){return t&&t.f.team==='Yes'}
 // Saved trips remember a step by position; map it from the order it was saved in (sv) to the same step now
 const STEP_ORDERS={1:['intake','research','legs','team','check','book','res','people','emergency','brief','during','debrief'],
-  2:['intake','research','legs','check','book','res','people','emergency','brief','team','during','debrief']};
-const STEP_VERSION=3;
+  2:['intake','research','legs','check','book','res','people','emergency','brief','team','during','debrief'],
+  3:['intake','research','check','legs','book','res','people','emergency','brief','team','during','debrief']};
+const STEP_VERSION=4;
 function migrateStep(t){if(!t||t.sv===STEP_VERSION)return t; const old=STEP_ORDERS[t.sv||1], id=old&&old[t.step], ni=STEPS.findIndex(s=>s.id===id); if(ni>=0)t.step=ni; t.sv=STEP_VERSION; return t}
 function visSteps(t=cur){return STEPS.map((_,i)=>i).filter(i=>shows(STEPS[i],t))}
 function fixStep(){const v=visSteps(); if(!v.includes(cur.step)){cur.step=v.filter(i=>i<cur.step).pop()??v[0]}}
@@ -18960,6 +19135,7 @@ function renderStep(){
       html+=`<h2>Entry rules to check</h2>`+(cs.length||un.length?`<p class="status">Check each on the official government or embassy site today, for every traveller’s passport.</p><ul class="countries">${cs.map(c=>`<li>${esc(c)}</li>`).join('')}${un.map(c=>`<li>${esc(c)} (country not recognised, check which it is)</li>`).join('')}</ul>`:`<p class="status">Add destinations in the Intake step and the countries show here.</p>`);}
     if(b.type==='teamgaps')html+=`<h2>Coverage</h2><div id="teamGaps">${teamGapsHTML()}</div>`;
     if(b.type==='teamgrid')html+=teamGridHTML();
+    if(b.type==='expenses')html+=expensesHTML();
     if(b.type==='resgaps')html+=`<h2>Coverage</h2><div id="resGaps">${resGapsHTML()}</div>`;
     if(b.type==='gaps')html+=`<h2>Coverage</h2><div id="gaps">${gapsHTML()}</div>`;
     if(b.type==='bookingcheck')html+=`<h2>Message to send</h2><pre class="msg" id="bcMsg">${esc(bookingMessage())}</pre><button class="btn primary" id="copyMsg">Copy message</button>`;
@@ -19094,6 +19270,7 @@ document.addEventListener('input',e=>{
     const sel=el.parentElement.querySelector('select'); if(sel){[...sel.options].forEach(o=>{if(!LEG_TYPES.includes(o.value))o.remove()});
       if(row.what!=='Other')sel.prepend(new Option(row.what,row.what,true,true)); sel.value=row.what}
     queueSave(); refreshDerived(); return}
+  if(el.dataset.exp!==undefined){const [i,k]=el.dataset.exp.split('|'); expensesList()[+i][k]=el.value; queueSave(); const sm=$('#expSum'); if(sm)sm.innerHTML=expSummaryHTML(); return}
   if(el.dataset.lx!==undefined){const [ri,i,k]=el.dataset.lx.split(':'); const x=cur.t.legs[+ri].extra[+i]; x[k]=el.value; queueSave(); return}
   if(el.dataset.t!==undefined){const row=cur.t[el.dataset.t][+el.dataset.r]; row[el.dataset.c]=el.value;
     if(el.dataset.t==='flights'&&el.dataset.c==='ref'&&el.value.trim()&&(row.status||'Gap')==='Gap'){row.status='Booked'; const ss=el.closest('tr,.legcard').querySelector('[data-c="status"]'); if(ss)ss.value='Booked'; el.closest('tr,.legcard').classList.remove('is-gap')}
@@ -19128,7 +19305,7 @@ document.addEventListener('keydown',e=>{
   else if(e.key==='Escape'){ if(ul)ul.hidden=true; e.target.setAttribute('aria-expanded','false'); }
   else if(e.key==='Backspace'&&!e.target.value){ const arr=destList(); if(arr.length){arr.pop(); cur.f.destination=arr.join(', '); afterDestChange()} }
 });
-document.addEventListener('change',e=>{ if(e.target.matches('select[data-f],select[data-t],select[data-bud],select[data-tg],select[data-fa],select[data-legsel]'))e.target.dispatchEvent(new Event('input',{bubbles:true})) });
+document.addEventListener('change',e=>{ if(e.target.matches('select[data-f],select[data-t],select[data-bud],select[data-tg],select[data-fa],select[data-legsel],select[data-exp]'))e.target.dispatchEvent(new Event('input',{bubbles:true})) });
 document.addEventListener('click',async e=>{
   const cp=e.target.closest('[data-cellpick]'); if(cp){pickCell(+cp.dataset.cellpick);return}
   const pp2=e.target.closest('[data-placepick]'); if(pp2){pickPlace(+pp2.dataset.placepick);return}
@@ -19194,6 +19371,15 @@ document.addEventListener('click',async e=>{
   const lv=e.target.closest('[data-legview]'); if(lv&&cur){cur.legView=lv.dataset.legview; queueSave(); renderStep(); return}
   const lfi=e.target.closest('[data-legfilter]'); if(lfi&&cur){cur.legFilter=lfi.dataset.legfilter; queueSave(); renderStep(); return}
   const le=e.target.closest('[data-legedit]'); if(le&&cur){cur.legView='detail'; cur.legP=le.dataset.legedit; queueSave(); renderStep(); return}
+  if(e.target.closest('[data-expadd]')&&cur){const ex=expensesList(), last=ex[ex.length-1]; ex.push({date:new Date().toISOString().slice(0,10),cat:'Other',cur:last?last.cur:'AUD',person:'Whole team',paid:'OPEX card',status:'Paid',amount:'',desc:''}); queueSave(); renderStep();
+    const d=document.querySelector(`[data-exp="${ex.length-1}|desc"]`); if(d){d.closest('.expcard').scrollIntoView({block:'center'}); d.focus()} return}
+  const xd=e.target.closest('[data-expdel]'); if(xd&&cur){const i=+xd.dataset.expdel, x=expensesList()[i]; if((x.desc||x.amount||(x.files||[]).length)&&!confirm(`Remove “${x.desc||'this expense'}”?${(x.files||[]).length?' Its invoices stay in Google Drive.':''}`))return; expensesList().splice(i,1); queueSave(); renderStep(); return}
+  const xa=e.target.closest('[data-expattach]'); if(xa&&cur){attachToExpense(expensesList()[+xa.dataset.expattach]); return}
+  const xl=e.target.closest('[data-explink]'); if(xl&&cur){const url=(prompt('Paste a link to the invoice (for example a Google Drive link)')||'').trim(); if(!url)return;
+    if(!/^https?:\/\//i.test(url)){toast('That doesn’t look like a link');return}
+    const name=(prompt('What should this link be called?','Invoice')||'').trim()||'Invoice'; const x=expensesList()[+xl.dataset.explink]; (x.files=x.files||[]).push({name,url}); queueSave(); renderStep(); return}
+  const xf=e.target.closest('[data-expfdel]'); if(xf&&cur){const [i,j]=xf.dataset.expfdel.split(':'); const x=expensesList()[+i]; if(!confirm(`Remove “${x.files[+j].name}”? The file stays in Google Drive.`))return; x.files.splice(+j,1); queueSave(); renderStep(); return}
+  if(e.target.closest('[data-expcsv]')&&cur){expensesCsv(); return}
   if(e.target.closest('[data-consfill]')&&cur){if(cur.f.consulate&&cur.f.consulate!==cur.f.consulateAuto&&!confirm('Replace what’s in the embassy box with the details for the destinations?'))return; autoConsulate(true); return}
   if(e.target.closest('[data-yespick]')&&cur){const fi=document.createElement('input'); fi.type='file'; fi.accept='image/*,application/pdf'; fi.multiple=true; fi.onchange=()=>uploadYes(fi.files);
     if(GOOGLE_CLIENT_ID&&!driveReady()){driveSignIn(()=>toast('Connected to Google Drive. Tap “choose an image” again')); return} fi.click(); return}
