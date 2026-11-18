@@ -454,16 +454,16 @@ const STEPS = [
    {type:'checks', title:'Personal trip', showIf:'personal', items:['Paid on Jaya’s personal card, never the OPEX card','Booked in his personal account, never admin@']},
    {type:'checks', title:'Done', items:[
      {t:'Name on every ticket exactly as on the passport, middle name included',dom:'Name on every ticket exactly as on photo ID, middle name included'},'Return booked with the outbound, changeable fare',
-     'Travelling together: one booking, seats side by side','Companions sent their own tickets and hotel details',
-     'Lounge access for every flight','In-flight Wi-Fi bought',
+     'Travelling together: one booking, seats side by side',{t:'Companions sent their own tickets and hotel details',showIf:'solo'},
+     {t:'Lounge access for every flight',showIf:'intl'},{t:'In-flight Wi-Fi bought',showIf:'intl'},
      'Every booking in Jaya’s calendar in local time, with confirmation, address and cancellation deadline',
-     {t:'All PDFs (tickets, hotel, entry, insurance) in the trip folder',dom:'All PDFs (tickets, hotel) in the trip folder'},
-     'Hotel paid and confirmation with Jaya 48 hours before check-in',
-     'Checked in online when it opened, seats picked, boarding pass sent']},
+     {t:'All PDFs (tickets, hotel, entry, insurance) in the trip folder',dom:'All PDFs (tickets, hotel) in the trip folder',showIf:'solo'},
+     {t:'Hotel paid and confirmation with Jaya 48 hours before check-in',showIf:'solo'},
+     {t:'Checked in online when it opened, seats picked, boarding pass sent',showIf:'solo'}]},
    {type:'table', title:'Rooming list', showIf:'team', key:'rooming', cols:[
      {k:'hotel',label:'Hotel',w:10},{k:'room',label:'Room type',w:8},{k:'guests',label:'Guests (names)',w:14},
      {k:'in',label:'Check-in',type:'date',w:8.5},{k:'out',label:'Check-out',type:'date',w:8.5},{k:'ref',label:'Ref',w:6}]},
-   {type:'checks', title:'Team', showIf:'team', items:['Rooming list sent to the hotel and confirmed','Every traveller’s flight and hotel booked, or marked as their own way']}
+   {type:'checks', title:'Team', showIf:'team', items:[{t:'Rooming list sent to the hotel and confirmed',showIf:'rooming'},'Every traveller’s flight and hotel booked, or marked as their own way']}
  ]},
  {id:'res', title:'Reservations', when:'After the “yes”',
   lead:'Restaurants, the venue, activities and anything else booked for the trip. These go in the trip brief and each person’s brief.',
@@ -542,7 +542,10 @@ const STEPS = [
      'Jaya’s “yes” covers every traveller’s booking',{t:'Names on tickets exactly as on each passport',dom:'Names on tickets exactly as on each person’s photo ID'},
      'People on the same flight seated together where possible','Each person sent their own tickets, hotel details and personal brief',
      'Dietary needs sent to restaurants and the venue','Everyone in the trip group chat, with each other’s numbers',
-     'Team told the plan and who to call on the day']}
+     'Team told the plan and who to call on the day',
+     {t:'All PDFs (tickets, hotel, entry, insurance) in the trip folder',dom:'All PDFs (tickets, hotel) in the trip folder'},
+     'Hotel paid and confirmation with Jaya 48 hours before check-in',
+     'Checked in online when it opened, seats picked, boarding passes sent to each person']}
  ]},
  {id:'during', title:'During the trip', when:'Every day away',
   lead:'Keep every pick-up and meeting moving, even when Jaya has poor internet.',
@@ -18492,7 +18495,7 @@ function afterDestChange(rest=''){
 function newTrip(){
   const id='t'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
   const leg=(what,where='')=>({day:'',local:'',syd:'',what,where,who:'',by:'',ref:'',status:'Gap'});
-  return {id,created:Date.now(),updated:Date.now(),step:0,sv:STEP_VERSION,cv:1,
+  return {id,created:Date.now(),updated:Date.now(),step:0,sv:STEP_VERSION,cv:2,
     f:{kind:'Work',team:'No',china:'No'},c:{},
     t:{
       travellers:[{name:'Jaya Yoannidis',mobile:'',chat:'',email:'',flights:''}],
@@ -18550,12 +18553,16 @@ function lateTravel(t=cur){
     ...fixedTimeLines(t).filter(x=>/flight|fly|arriv|land/i.test(x.note||'')).map(x=>x.time)].filter(v=>/^\d\d:\d\d/.test(v||''));
   return !times.length||times.some(v=>v>='22:00'||v<'07:00');
 }
+// The rooming list is only needed when we book the rooms ourselves
+function roomingOn(t=cur){return t.f.team==='Yes'&&(t.f.opt_rooming==='Yes'||(t.t.rooming||[]).some(r=>r.hotel||r.guests||r.ref))}
 function scopeOf(t=cur){return t.f.scope||autoScope(t)}
 function isIntl(t=cur){return scopeOf(t)!=='Domestic'}
 const itemText=(it,t=cur)=>typeof it==='string'?it:(!isIntl(t)&&it.dom)||it.t;
 function shows(b,t=cur){
   if(!b.showIf)return true;
   if(b.showIf==='intl')return isIntl(t);
+  if(b.showIf==='solo')return t.f.team!=='Yes';
+  if(b.showIf==='rooming')return roomingOn(t);
   if(b.showIf==='train')return needsTrain(t);
   if(b.showIf==='late')return lateTravel(t);
   if(b.showIf==='domestic')return !isIntl(t);
@@ -18850,7 +18857,11 @@ const STEP_VERSION=4;
 // Intake's "Budget limits or anything unusual" check was removed; move the tick on the item after it up one place
 function migrateChecks(t){if(!t||t.cv>=1||!t.c)return; const bi=STEPS[0].blocks.findIndex(b=>b.type==='checks'&&b.title==='Done'), k=`intake.${bi}.`;
   if(bi>=0){if(t.c[k+'6'])t.c[k+'5']=true; else delete t.c[k+'5']; delete t.c[k+'6']} t.cv=1}
-function migrateStep(t){migrateChecks(t); if(!t||t.sv===STEP_VERSION)return t; const old=STEP_ORDERS[t.sv||1], id=old&&old[t.step], ni=STEPS.findIndex(s=>s.id===id); if(ni>=0)t.step=ni; t.sv=STEP_VERSION; return t}
+// Book and Record's PDFs, hotel-paid and check-in ticks moved to Team for team trips; carry the ticks across
+function migrateChecks2(t){if(!t||t.cv>=2||!t.c)return; const bk=STEPS.findIndex(s=>s.id==='book'), tm=STEPS.findIndex(s=>s.id==='team');
+  const bbi=STEPS[bk].blocks.findIndex(b=>b.type==='checks'&&b.title==='Done'), tbi=STEPS[tm].blocks.findIndex(b=>b.type==='checks'&&b.title==='Done');
+  [[7,7],[8,8],[9,9]].forEach(([from,to])=>{if(t.c[`book.${bbi}.${from}`])t.c[`team.${tbi}.${to}`]=true}); t.cv=2}
+function migrateStep(t){migrateChecks(t); migrateChecks2(t); if(!t||t.sv===STEP_VERSION)return t; const old=STEP_ORDERS[t.sv||1], id=old&&old[t.step], ni=STEPS.findIndex(s=>s.id===id); if(ni>=0)t.step=ni; t.sv=STEP_VERSION; return t}
 function visSteps(t=cur){return STEPS.map((_,i)=>i).filter(i=>shows(STEPS[i],t))}
 function fixStep(){const v=visSteps(); if(!v.includes(cur.step)){cur.step=v.filter(i=>i<cur.step).pop()??v[0]}}
 function personMatch(text,name){
@@ -19200,7 +19211,8 @@ function renderStep(){
     html+=`<section class="block">${b.title&&b.type!=='flights'?`<h2>${esc(titleCase(b.title))}</h2>`:''}`;
     if(b.type==='fields')html+=`<div class="grid">${b.fields.filter(f=>shows(f)).map(fieldHTML).join('')}</div>`;
     if(b.type==='table'&&b.perPerson)html+=legViewToggleHTML()+(cur.legView==='overview'?legOverviewHTML():cur.legView==='map'?legMapHTML():legTabsHTML()+legStartHTML()+tableHTML(b)+legCopyHTML());
-    else if(b.type==='table')html+=tableHTML(b);
+    else if(b.type==='table'&&b.key==='rooming'&&!roomingOn())html+=`<p class="status" style="margin-top:0">Only needed if you’re booking the rooms yourself.</p><button type="button" class="btn" data-opt="rooming">Add a rooming list</button>`;
+    else if(b.type==='table')html+=tableHTML(b)+(b.key==='rooming'&&!(cur.t.rooming||[]).some(r=>r.hotel||r.guests||r.ref)?`<button type="button" class="btn quiet add" data-opt="rooming">Hide the rooming list</button>`:'');
     if(b.type==='flights')html+=flightAddHTML()+tableHTML(b);
     if(b.type==='checks')html+=`<ul class="checks">${b.items.map((it,ii)=>{if(!shows(it))return ''; const k=`${s.id}.${bi}.${ii}`;return `<li><label><input type="checkbox" data-check="${k}" ${cur.c[k]?'checked':''}><span>${esc(itemText(it))}</span></label></li>`}).join('')}</ul>`;
     if(b.type==='countries'){const cs=routeCountries(),un=unlistedCities();
