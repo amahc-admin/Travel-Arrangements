@@ -18433,8 +18433,37 @@ const PLACE_HOME={lat:-33.8688,lon:151.2093}, cityPoints=new Map();
 async function cityPoint(name){
   const c=findCity(name), key=c?c.name+'|'+c.country:name; if(cityPoints.has(key))return cityPoints.get(key);
   const pr=fetch('https://photon.komoot.io/api/?limit=1&lang=en&osm_tag=place&q='+encodeURIComponent(c?c.name+', '+c.country:name))
-    .then(r=>r.ok?r.json():null).then(j=>{const g=j&&j.features&&j.features[0]&&j.features[0].geometry; return g?{lat:g.coordinates[1],lon:g.coordinates[0]}:null}).catch(()=>null);
+    .then(r=>r.ok?r.json():null).then(j=>{const f=j&&j.features&&j.features[0], g=f&&f.geometry, pp=(f&&f.properties)||{};
+      return g?{lat:g.coordinates[1],lon:g.coordinates[0],cc:(pp.countrycode||'').toUpperCase(),country:pp.country||'',name:pp.name||name}:null}).catch(()=>null);
   cityPoints.set(key,pr); return pr;
+}
+// Australian missions, from official DFAT and mission websites (checked Nov 2026). lat/lon only pick the nearest one.
+const AU_MISSIONS=[/*MISSIONS*/];
+const SMARTRAVELLER={/*SMARTRAVELLER*/};
+const AU_CEC=/*CEC*/'';
+async function consulateText(){
+  const dests=destList(); if(!dests.length)return null;
+  const byMission=new Map(), missing=[];
+  for(const d of dests){const pt=await cityPoint(d); if(!pt){missing.push(d);continue}
+    // Hong Kong and Macau come back as China, but have their own consulate
+    const cc=/hong ?kong|kowloon|macau|macao/i.test(d+' '+pt.name)?'HK':pt.cc;
+    const near=AU_MISSIONS.filter(m=>m.cc===cc).sort((a,b)=>kmBetween(pt,a)-kmBetween(pt,b))[0];
+    if(near){(byMission.get(near)||byMission.set(near,[]).get(near)).push(d)} else missing.push(d+(pt.country?` (${pt.country})`:''))}
+  const parts=[...byMission].map(([m,cities])=>`${m.name}${dests.length>1?` (for ${cities.join(', ')})`:''}\n${m.address}\nPhone: ${m.phone}`);
+  if(missing.length)parts.push(`No Australian embassy or consulate found nearby for ${missing.join(', ')}. Find the nearest at https://www.dfat.gov.au/about-us/our-locations/missions`);
+  if(AU_CEC)parts.push(AU_CEC);
+  let smart=''; for(const d of dests){const pt=await cityPoint(d); const cc=pt&&(/hong ?kong|kowloon|macau|macao/i.test(d+' '+pt.name)?'HK':pt.cc); if(cc&&SMARTRAVELLER[cc]){smart=SMARTRAVELLER[cc];break}}
+  return {text:parts.join('\n\n'),smart};
+}
+// Fill the consulate box from the destinations, unless someone has typed their own text there
+async function autoConsulate(force){
+  const trip=cur; if(!trip)return; const f=trip.f;
+  if(!force&&f.consulate&&f.consulate!==f.consulateAuto)return;
+  const r=await consulateText().catch(()=>null); if(!r||cur!==trip)return;
+  if(!force&&f.consulate&&f.consulate!==f.consulateAuto)return;
+  f.consulate=r.text; f.consulateAuto=r.text; if(r.smart&&(!f.smartraveller||force))f.smartraveller=r.smart;
+  queueSave(); const ta=document.querySelector('[data-f="consulate"]'); if(ta){ta.value=f.consulate; const sm=document.querySelector('[data-f="smartraveller"]'); if(sm)sm.value=f.smartraveller||''}
+  if(force)toast('Filled in from the destinations');
 }
 async function placeBiasPoints(){
   const pts=(await Promise.all(destList().slice(0,3).map(cityPoint))).filter(Boolean);
@@ -18640,7 +18669,8 @@ function fieldHTML(f){
   if(f.type==='textarea')input=`<textarea ${attrs}>${esc(v)}</textarea>`;
   else if(f.type==='select')input=`<select ${attrs}>${f.options.map(o=>`<option ${o===v?'selected':''}>${esc(o)}</option>`).join('')}</select>`;
   else input=`<input type="${f.type||'text'}" ${attrs} value="${esc(v)}">`;
-  return `<label class="f ${f.wide?'wide':''}">${esc(f.label)}${input}</label>`+(f.k==='yesLink'?`<div class="f wide">${yesZoneHTML()}</div>`:'');
+  return `<label class="f ${f.wide?'wide':''}">${esc(f.label)}${input}</label>`+(f.k==='yesLink'?`<div class="f wide">${yesZoneHTML()}</div>`:'')
+    +(f.k==='consulate'?(queueMicrotask(()=>autoConsulate(false)),`<div class="f wide"><div class="row"><button type="button" class="btn" data-consfill="1">Fill in from destinations</button><span class="status">${destList().length?'Uses the nearest Australian embassy or consulate to each city.':'Add the destination cities in Intake first.'}</span></div></div>`):'');
 }
 function cellInput(b,c,r,ri){
   const v=r[c.k]??''; const a=`data-t="${b.key}" data-r="${ri}" data-c="${c.k}" aria-label="${esc(c.label)} row ${ri+1}"`;
@@ -19164,6 +19194,7 @@ document.addEventListener('click',async e=>{
   const lv=e.target.closest('[data-legview]'); if(lv&&cur){cur.legView=lv.dataset.legview; queueSave(); renderStep(); return}
   const lfi=e.target.closest('[data-legfilter]'); if(lfi&&cur){cur.legFilter=lfi.dataset.legfilter; queueSave(); renderStep(); return}
   const le=e.target.closest('[data-legedit]'); if(le&&cur){cur.legView='detail'; cur.legP=le.dataset.legedit; queueSave(); renderStep(); return}
+  if(e.target.closest('[data-consfill]')&&cur){if(cur.f.consulate&&cur.f.consulate!==cur.f.consulateAuto&&!confirm('Replace what’s in the embassy box with the details for the destinations?'))return; autoConsulate(true); return}
   if(e.target.closest('[data-yespick]')&&cur){const fi=document.createElement('input'); fi.type='file'; fi.accept='image/*,application/pdf'; fi.multiple=true; fi.onchange=()=>uploadYes(fi.files);
     if(GOOGLE_CLIENT_ID&&!driveReady()){driveSignIn(()=>toast('Connected to Google Drive. Tap “choose an image” again')); return} fi.click(); return}
   const yd=e.target.closest('[data-yesdel]'); if(yd&&cur){const i=+yd.dataset.yesdel, f=cur.f.yesFiles[i]; if(!confirm(`Remove “${f.name}”? The file stays in Google Drive.`))return; cur.f.yesFiles.splice(i,1); if(cur.f.yesLink===f.url)cur.f.yesLink=(cur.f.yesFiles[0]||{}).url||''; queueSave(); renderStep(); return}
