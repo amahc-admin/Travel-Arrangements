@@ -395,12 +395,12 @@ const STEPS = [
      {k:'localPay',label:'Local payments (e.g. Alipay, WeChat Pay)'},
      {k:'cash',label:'Cash'}]},
    {type:'checks', title:'Checked against the profile', items:[
-     'Airline and cabin match the profile (points first, no cash for business or first)',
-     'Timing fits: premium economy by day, red-eye only in business, morning after an overnight arrival kept free',
+     {t:'Airline and cabin match the profile (points first, no cash for business or first)',dom:'Airline matches the profile, economy (points first)'},
+     {t:'Timing fits: premium economy by day, red-eye only in business, morning after an overnight arrival kept free',showIf:'intl'},
      'Seats match the profile',
-     'Train class from the profile, or asked',
+     {t:'Train class from the profile, or asked',showIf:'train'},
      'Hotel default for the city, or event hotel before the group-rate deadline',
-     'Arrival after 10pm or before 7am: car with a sign to pre-book',
+     {t:'Arrival after 10pm or before 7am: car with a sign to pre-book',showIf:'late'},
      {t:'Entry rules checked on the official site today, for every country and every traveller’s passport',showIf:'intl'},
      {t:'Passport valid 6+ months past return for every traveller',showIf:'intl'},
      {t:'Travel insurance in place',showIf:'intl'}]}
@@ -18541,12 +18541,23 @@ async function removeTrip(trip){
 /* ---------- visibility + progress ---------- */
 // Domestic means every destination is in Australia; it can also be set by hand in Intake
 function autoScope(t=cur){const cs=[...new Set((t.f.destination||'').split(/[,;]+/).map(x=>x.trim()).filter(Boolean).map(x=>findCity(x)?.country||'?'))]; return cs.length&&cs.every(c=>c==='Australia'||c==='AU')?'Domestic':'International'}
+// Only ask about trains when a train is somewhere in the plan
+function fixedTimeLines(t){return Object.values(t.times||{}).flatMap(x=>[x,...(x.more||[])])}
+function needsTrain(t=cur){return [...(t.t.legs||[]).map(l=>l.what),t.f.bcTrain,...fixedTimeLines(t).map(x=>x.note)].some(v=>/\btrain|\brail/i.test(v||''))}
+// Only ask about a late-night or early-morning car when a flight lands (or leaves) between 10pm and 7am; ask when no times are known yet
+function lateTravel(t=cur){
+  const times=[...(t.t.flights||[]).map(r=>r.arr||r.dep),...(t.t.legs||[]).filter(l=>/flight|pick-up on arrival|airport to home/i.test(l.what||'')).map(l=>l.local),
+    ...fixedTimeLines(t).filter(x=>/flight|fly|arriv|land/i.test(x.note||'')).map(x=>x.time)].filter(v=>/^\d\d:\d\d/.test(v||''));
+  return !times.length||times.some(v=>v>='22:00'||v<'07:00');
+}
 function scopeOf(t=cur){return t.f.scope||autoScope(t)}
 function isIntl(t=cur){return scopeOf(t)!=='Domestic'}
 const itemText=(it,t=cur)=>typeof it==='string'?it:(!isIntl(t)&&it.dom)||it.t;
 function shows(b,t=cur){
   if(!b.showIf)return true;
   if(b.showIf==='intl')return isIntl(t);
+  if(b.showIf==='train')return needsTrain(t);
+  if(b.showIf==='late')return lateTravel(t);
   if(b.showIf==='domestic')return !isIntl(t);
   if(b.showIf==='china')return t.f.china==='Yes'&&isIntl(t);
   if(b.showIf==='personal')return t.f.kind==='Personal';
