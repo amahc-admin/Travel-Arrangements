@@ -267,6 +267,16 @@ body.noselect{user-select:none;-webkit-user-select:none;cursor:grabbing}
 .exp-noinv{color:var(--gap);font-size:.88rem}
 .exp-del{margin-left:auto}
 .lc-acts .btn.exp-del{color:var(--muted)}
+.exp-for{position:relative}
+.exp-for summary{list-style:none;cursor:pointer;padding:.5rem 2rem .5rem .6rem;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font-size:.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative}
+.exp-for summary::-webkit-details-marker{display:none}
+.exp-for summary::after{content:"▾";position:absolute;right:.65rem;top:50%;transform:translateY(-50%);color:var(--muted)}
+.exp-for[open] summary{border-color:var(--accent)}
+.exp-for-list{position:absolute;z-index:6;top:calc(100% + 4px);left:0;min-width:100%;width:max-content;max-width:min(22rem,90vw);max-height:18rem;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:.35rem;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+.exp-for-list label{display:flex;align-items:center;gap:.5rem;padding:.35rem .5rem;border-radius:6px;cursor:pointer;color:var(--ink);font-size:.92rem}
+.exp-for-list label:hover{background:var(--soft)}
+.exp-for-list input{width:1.05rem;height:1.05rem;accent-color:var(--accent)}
+.exp-for-list label:first-child{border-bottom:1px solid var(--line);border-radius:6px 6px 0 0;margin-bottom:.2rem}
 .exp-doc{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.5rem 1rem;padding:.6rem 1rem;border:1px solid var(--line);border-radius:10px;background:var(--surface);margin:.5rem 0 0;font-size:.92rem;color:var(--muted)}
 .exp-doc a{color:var(--accent)}
 .exp-sum{padding:.75rem 1rem;border:1px solid var(--line);border-radius:10px;background:var(--bg);margin-bottom:.5rem}
@@ -18356,6 +18366,10 @@ const EXP_PAID=['OPEX card','AMEX card','Personal card','Cash','Invoice to pay']
 const EXP_STATUS=['Paid','To pay','To reimburse','Reimbursed'];
 const expNum=v=>{const n=parseFloat(String(v||'').replace(/[^0-9.\-]/g,'')); return isFinite(n)?n:0};
 const money=(n,c)=>`${c} ${n.toLocaleString('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+// Who an expense is for: some people, or (none picked) the whole team. Older expenses kept one name in .person
+function expPeople(e){return e.people||(e.person&&e.person!=='Whole team'?[e.person]:[])}
+function expFor(e){const p=expPeople(e); return !p.length?'Whole team':p.length===1?p[0]:p.length<=3?p.map(n=>n.split(' ')[0]).join(', '):`${p.length} people`}
+function expForFull(e){const p=expPeople(e); return p.length?p.join(', '):'Whole team'}
 function expensesList(){return cur.t.expenses||(cur.t.expenses=[])}
 function expSummaryHTML(){
   const ex=expensesList(); if(!ex.length)return '<p class="status">No expenses yet. Add the first one below.</p>';
@@ -18376,7 +18390,9 @@ function expensesHTML(){
         <label class="f">Category<select data-exp="${i}|cat">${opt(EXP_CATS,e.cat||'Other')}</select></label>
         <label class="f exp-wide">What and who it was paid to<input type="text" data-exp="${i}|desc" value="${esc(e.desc||'')}" placeholder="e.g. Qantas, flights for Thomas and Luca"></label>
         <label class="f">Amount<div class="exp-amt"><select data-exp="${i}|cur" aria-label="Currency">${opt(CURRENCIES,e.cur||'AUD')}</select><input type="text" inputmode="decimal" data-exp="${i}|amount" value="${esc(e.amount||'')}" placeholder="0.00" aria-label="Amount"></div></label>
-        <label class="f">For<select data-exp="${i}|person">${opt(['Whole team',...people],e.person||'Whole team')}</select></label>
+        <div class="f">For<details class="exp-for"><summary data-expforsum="${i}">${esc(expFor(e))}</summary><div class="exp-for-list" role="group" aria-label="Who this expense is for">
+          <label><input type="checkbox" data-expforall="${i}" ${expPeople(e).length?'':'checked'}> Whole team</label>
+          ${people.map(n=>`<label><input type="checkbox" data-expfor="${i}" value="${esc(n)}" ${expPeople(e).includes(n)?'checked':''}> ${esc(n)}</label>`).join('')}</div></details></div>
         <label class="f">Paid with<select data-exp="${i}|paid">${opt(EXP_PAID,e.paid||'OPEX card')}</select></label>
         <label class="f">Status<select data-exp="${i}|status">${opt(EXP_STATUS,e.status||'Paid')}</select></label>
       </div>
@@ -18406,7 +18422,7 @@ function expenseReportHTML(trip){
   const sumRows=Object.entries(sums).map(([c,s])=>{const bud=(trip.budget||[]).filter(b=>b.c===c&&b.for==='Whole trip').reduce((a,b)=>a+expNum(b.a),0);
     return `<tr><td><b>${c}</b></td><td><b>${money(s.total,c)}</b></td>${hasBud?`<td>${bud?money(bud,c):''}</td><td>${bud?money(bud-s.total,c):''}</td>`:''}<td>${s.toPay?money(s.toPay,c):''}</td><td>${s.owed?money(s.owed,c):''}</td></tr>`}).join('');
   const catRows=Object.entries(sums).flatMap(([c,s])=>Object.entries(s.cats).sort((a,b)=>b[1]-a[1]).map(([k,n])=>`<tr><td>${e(k)}</td><td>${money(n,c)}</td></tr>`)).join('');
-  const rows=ex.map(x=>`<tr><td>${e(x.date||'')}</td><td>${e(x.person||'Whole team')}</td><td>${e(x.cat||'Other')}</td><td>${e(x.desc||'')}</td><td>${e(x.paid||'OPEX card')}</td><td>${e(x.status||'Paid')}</td><td>${money(expNum(x.amount),x.cur||'AUD')}</td><td>${(x.files||[]).length?x.files.map(fl=>`<a href="${e(fl.url)}">${e(fl.name)}</a>`).join('<br>'):'<span style="color:#B4441A">Missing</span>'}</td></tr>`).join('');
+  const rows=ex.map(x=>`<tr><td>${e(x.date||'')}</td><td>${e(expForFull(x))}</td><td>${e(x.cat||'Other')}</td><td>${e(x.desc||'')}</td><td>${e(x.paid||'OPEX card')}</td><td>${e(x.status||'Paid')}</td><td>${money(expNum(x.amount),x.cur||'AUD')}</td><td>${(x.files||[]).length?x.files.map(fl=>`<a href="${e(fl.url)}">${e(fl.name)}</a>`).join('<br>'):'<span style="color:#B4441A">Missing</span>'}</td></tr>`).join('');
   const th=t=>`<th style="background:#EDF1EE;text-align:left">${t}</th>`;
   return `<html><head><meta charset="utf-8"></head><body style="font-family:Arial,sans-serif">
 <h1>Expenses: ${e(tripName(trip))}</h1><p>${dates?e(dates)+' · ':''}${ex.length} expense${ex.length===1?'':'s'} · Updated ${e(new Date().toLocaleString('en-AU',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}))}</p>
@@ -18442,7 +18458,7 @@ function refreshExpDoc(){const el=document.getElementById('expDoc'); if(el&&cur)
 async function expensesCsv(){
   const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
   const lines=[['Date','For','Category','What','Amount','Currency','Paid with','Status','Invoices and receipts'].map(q).join(',')]
-    .concat(expensesList().map(e=>[e.date,e.person||'Whole team',e.cat||'Other',e.desc,expNum(e.amount).toFixed(2),e.cur||'AUD',e.paid||'OPEX card',e.status||'Paid',(e.files||[]).map(f=>f.url).join(' ')].map(q).join(',')));
+    .concat(expensesList().map(e=>[e.date,expForFull(e),e.cat||'Other',e.desc,expNum(e.amount).toFixed(2),e.cur||'AUD',e.paid||'OPEX card',e.status||'Paid',(e.files||[]).map(f=>f.url).join(' ')].map(q).join(',')));
   const name=('Expenses - '+tripName(cur)).replace(/[\\/:*?"<>|]+/g,'-')+'.csv', blob=new Blob(['\ufeff'+lines.join('\r\n')],{type:'text/csv'});
   if(downloads){try{await downloads.save({filename:name,data:blob})}catch(_){}} else{const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000)}
 }
@@ -19354,6 +19370,10 @@ document.addEventListener('input',e=>{
     const sel=el.parentElement.querySelector('select'); if(sel){[...sel.options].forEach(o=>{if(!LEG_TYPES.includes(o.value))o.remove()});
       if(row.what!=='Other')sel.prepend(new Option(row.what,row.what,true,true)); sel.value=row.what}
     queueSave(); refreshDerived(); return}
+  if(el.dataset.expfor!==undefined||el.dataset.expforall!==undefined){const i=+(el.dataset.expfor??el.dataset.expforall), x=expensesList()[i], box=el.closest('.exp-for-list');
+    if(el.dataset.expforall!==undefined){if(el.checked)box.querySelectorAll('[data-expfor]').forEach(c=>c.checked=false)} else box.querySelector('[data-expforall]').checked=false;
+    x.people=[...box.querySelectorAll('[data-expfor]:checked')].map(c=>c.value); if(!x.people.length)box.querySelector('[data-expforall]').checked=true; delete x.person;
+    const sm=document.querySelector(`[data-expforsum="${i}"]`); if(sm)sm.textContent=expFor(x); queueSave(); expDocSoon(); return}
   if(el.dataset.exp!==undefined){const [i,k]=el.dataset.exp.split('|'); expensesList()[+i][k]=el.value; queueSave(); expDocSoon(); const sm=$('#expSum'); if(sm)sm.innerHTML=expSummaryHTML(); return}
   if(el.dataset.lx!==undefined){const [ri,i,k]=el.dataset.lx.split(':'); const x=cur.t.legs[+ri].extra[+i]; x[k]=el.value; queueSave(); return}
   if(el.dataset.t!==undefined){const row=cur.t[el.dataset.t][+el.dataset.r]; row[el.dataset.c]=el.value;
@@ -19389,7 +19409,7 @@ document.addEventListener('keydown',e=>{
   else if(e.key==='Escape'){ if(ul)ul.hidden=true; e.target.setAttribute('aria-expanded','false'); }
   else if(e.key==='Backspace'&&!e.target.value){ const arr=destList(); if(arr.length){arr.pop(); cur.f.destination=arr.join(', '); afterDestChange()} }
 });
-document.addEventListener('change',e=>{ if(e.target.matches('select[data-f],select[data-t],select[data-bud],select[data-tg],select[data-fa],select[data-legsel],select[data-exp]'))e.target.dispatchEvent(new Event('input',{bubbles:true})) });
+document.addEventListener('change',e=>{ if(e.target.matches('select[data-f],select[data-t],select[data-bud],select[data-tg],select[data-fa],select[data-legsel],select[data-exp],input[data-expfor],input[data-expforall]'))e.target.dispatchEvent(new Event('input',{bubbles:true})) });
 document.addEventListener('click',async e=>{
   const cp=e.target.closest('[data-cellpick]'); if(cp){pickCell(+cp.dataset.cellpick);return}
   const pp2=e.target.closest('[data-placepick]'); if(pp2){pickPlace(+pp2.dataset.placepick);return}
@@ -19457,7 +19477,8 @@ document.addEventListener('click',async e=>{
   const lv=e.target.closest('[data-legview]'); if(lv&&cur){cur.legView=lv.dataset.legview; queueSave(); renderStep(); return}
   const lfi=e.target.closest('[data-legfilter]'); if(lfi&&cur){cur.legFilter=lfi.dataset.legfilter; queueSave(); renderStep(); return}
   const le=e.target.closest('[data-legedit]'); if(le&&cur){cur.legView='detail'; cur.legP=le.dataset.legedit; queueSave(); renderStep(); return}
-  if(e.target.closest('[data-expadd]')&&cur){const ex=expensesList(), last=ex[ex.length-1]; ex.push({date:new Date().toISOString().slice(0,10),cat:'Other',cur:last?last.cur:'AUD',person:'Whole team',paid:'OPEX card',status:'Paid',amount:'',desc:''}); queueSave(); renderStep();
+  document.querySelectorAll('details.exp-for[open]').forEach(d=>{if(!d.contains(e.target))d.open=false});
+  if(e.target.closest('[data-expadd]')&&cur){const ex=expensesList(), last=ex[ex.length-1]; ex.push({date:new Date().toISOString().slice(0,10),cat:'Other',cur:last?last.cur:'AUD',people:[],paid:'OPEX card',status:'Paid',amount:'',desc:''}); queueSave(); renderStep();
     const d=document.querySelector(`[data-exp="${ex.length-1}|desc"]`); if(d){d.closest('.expcard').scrollIntoView({block:'center'}); d.focus()} return}
   const xd=e.target.closest('[data-expdel]'); if(xd&&cur){const i=+xd.dataset.expdel, x=expensesList()[i]; if((x.desc||x.amount||(x.files||[]).length)&&!confirm(`Remove “${x.desc||'this expense'}”?${(x.files||[]).length?' Its invoices stay in Google Drive.':''}`))return; expensesList().splice(i,1); queueSave(); renderStep(); expDocSoon(); return}
   const xa=e.target.closest('[data-expattach]'); if(xa&&cur){attachToExpense(expensesList()[+xa.dataset.expattach]); return}
